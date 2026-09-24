@@ -65,7 +65,10 @@ export default defineConfig({
       workbox: {
         // App shell: Vite's hashed bundles, the HTML and the icons are
         // precached and revisioned, so a deploy swaps them atomically.
+        // Social card previews (og-image / twitter-image) are excluded so they do
+        // not bloat player offline installs or exceed Workbox precache limits.
         globPatterns: ['**/*.{js,css,html,svg,png,webmanifest,txt,woff2}'],
+        globIgnores: ['**/og-image.png', '**/twitter-image.png', '**/Twitter-image.png'],
         // Offline launches of the app URL (with any query, e.g. ?seed=) get the
         // cached shell. The game has no routes; other paths are not app pages
         // (and, with base './', could not resolve the relative asset URLs).

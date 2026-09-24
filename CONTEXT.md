@@ -896,3 +896,52 @@ None of this was tested on a real device. It all ran in emulation.
   install guide.
 - **Desktop Chrome/Edge:** install from the menu button or the address bar;
   standalone window; WASD; resize; offline launch; update.
+
+---
+
+## 18. Social Preview & Open Graph Implementation
+
+### Summary
+
+The official VOIDRUSH social sharing preview asset (`Twitter-image.png`) has been integrated as the official Open Graph and X/Twitter Card preview image across social platforms (Twitter/X, Discord, WhatsApp, LinkedIn, Telegram, Facebook, Slack).
+
+### Asset Details & Storage
+
+- **Static Asset Locations:**
+  - `public/og-image.png`: Primary Open Graph asset served at root (`https://getvoidrush.vercel.app/og-image.png`).
+  - `public/twitter-image.png`: Mirror fallback asset ensuring direct crawler requests resolve.
+- **Integrity & Preservation:**
+  - Preserved original 1730×909 high-resolution graphic (SHA256: `d6aa779e0dbb1320a404886fe19b9447126e33344c0731f2c00342e1555d542b`) without stretching, cropping, or re-compression.
+  - Open Graph standard dimensions set to 1200×630 with MIME type `image/png`.
+
+### Metadata Configuration (`index.html`)
+
+- **Canonical URL:** `https://getvoidrush.vercel.app/`
+- **Open Graph Metadata:**
+  - `og:type`: `website`
+  - `og:site_name`: `VOIDRUSH`
+  - `og:url`: `https://getvoidrush.vercel.app/`
+  - `og:title`: `VOIDRUSH — Endless Flight`
+  - `og:description`: `VOIDRUSH - a first-person endless flight through a voxel tunnel. Dodge, thread the gap, go faster.`
+  - `og:image`: `https://getvoidrush.vercel.app/og-image.png`
+  - `og:image:secure_url`: `https://getvoidrush.vercel.app/og-image.png`
+  - `og:image:type`: `image/png`
+  - `og:image:width`: `1200`
+  - `og:image:height`: `630`
+  - `og:image:alt`: `VOIDRUSH — Endless Flight: first-person endless voxel tunnel runner`
+- **X / Twitter Card Metadata:**
+  - `twitter:card`: `summary_large_image`
+  - `twitter:url`: `https://getvoidrush.vercel.app/`
+  - `twitter:title`: `VOIDRUSH — Endless Flight`
+  - `twitter:description`: `VOIDRUSH - a first-person endless flight through a voxel tunnel. Dodge, thread the gap, go faster.`
+  - `twitter:image`: `https://getvoidrush.vercel.app/og-image.png`
+  - `twitter:image:alt`: `VOIDRUSH — Endless Flight: first-person endless voxel tunnel runner`
+  - `twitter:image:type`: `image/png`
+  - `twitter:image:width`: `1200`
+  - `twitter:image:height`: `630`
+
+### Edge Caching & Service Worker Optimization
+
+- **PWA Service Worker (`vite.config.ts`):** Excluded `**/og-image.png`, `**/twitter-image.png`, and `**/Twitter-image.png` from Workbox precache using `globIgnores`. Prevents unnecessary 2.2 MB cache bloat on client devices while keeping PWA precache footprint compact (~817 KiB).
+- **Vercel Edge Headers (`vercel.json`):** Configured `Cache-Control: public, max-age=86400, stale-while-revalidate=604800` for `/(og-image|twitter-image).png` for fast CDN delivery and revalidation.
+
