@@ -55,10 +55,19 @@ export const TUNNEL = frozen({
   /** Clearance a polygonal chamfer keeps beyond the minimum it could sit at. */
   CHAMFER_MARGIN: 0.6,
 
-  /** Rows between accent rings in the RINGS wall pattern. */
-  RING_INTERVAL: 6,
-  /** Rows between structural ribs in the RIBS wall pattern. */
+  /*
+   * Wall rhythm. Rings, ribs and guide-rail dashes all count the same run-wide
+   * row number and share a beat of four rows, so the speed markers stay in
+   * step when the wall pattern changes between sections.
+   */
+  /** Rows between accent rings in the RINGS wall pattern: every other beat. */
+  RING_INTERVAL: 8,
+  /** Rows between structural ribs in the RIBS wall pattern: every beat. */
   RIB_INTERVAL: 4,
+  /** Rows in one guide-rail period along the tunnel corners. */
+  GUIDE_RAIL_PERIOD: 4,
+  /** Lit rows at the start of each guide-rail period; the rest are the gap. */
+  GUIDE_RAIL_DASH: 3,
   /** Protrusion used between ribs, so the ribs read. */
   RIB_FLAT_PROTRUSION: 0.25,
 

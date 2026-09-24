@@ -85,6 +85,7 @@ export class InputManager {
     this.target.addEventListener('keyup', this.handleKeyUp);
     this.target.addEventListener('blur', this.handleBlur);
     this.target.document.addEventListener('visibilitychange', this.handleVisibility);
+    this.target.addEventListener('contextmenu', this.handleContextMenu);
   }
 
   dispose(): void {
@@ -94,6 +95,7 @@ export class InputManager {
     this.target.removeEventListener('keyup', this.handleKeyUp);
     this.target.removeEventListener('blur', this.handleBlur);
     this.target.document.removeEventListener('visibilitychange', this.handleVisibility);
+    this.target.removeEventListener('contextmenu', this.handleContextMenu);
     this.clear();
   }
 
@@ -201,6 +203,13 @@ export class InputManager {
     if (this.target.document.visibilityState === 'hidden') {
       this.clear();
       this.callbacks.onBlur();
+    }
+  };
+
+  /** Suppress browser context menu while playing so right clicking does not pause or block the run. */
+  private readonly handleContextMenu = (event: MouseEvent): void => {
+    if (this.callbacks.isPlaying()) {
+      event.preventDefault();
     }
   };
 }

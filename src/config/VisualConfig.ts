@@ -121,8 +121,30 @@ export const VISUAL = frozen({
 
   BLOOM_STRENGTH: 0.7,
   BLOOM_RADIUS: 0.5,
-  /** High enough that obstacle edges glow but do not blob. */
+  /**
+   * High enough that obstacle edges glow but do not blob. The edge texture's
+   * rim samples at full instance colour and so crosses this; the face interior
+   * sits at OBSTACLE_FACE_INTERIOR of it, which for the darker obstacle tones
+   * falls back under the threshold, so the glow concentrates on the outline.
+   */
   BLOOM_THRESHOLD: 0.72,
+
+  /*
+   * Obstacle face treatment (see Materials.ts). Obstacles are unlit, so these
+   * factors are the only shading they get. All are linear multipliers on the
+   * instance colour.
+   */
+  /**
+   * Brightness of a face's interior relative to its glowing rim. Bounded below
+   * by readability: the dimmest resolved obstacle tone needs about 0.85 of its
+   * value to keep MIN_OBSTACLE_CONTRAST against the tunnel base, which tests
+   * assert for the camera-facing face.
+   */
+  OBSTACLE_FACE_INTERIOR: 0.86,
+  /** Side faces (normal across the view direction) relative to the front face. */
+  OBSTACLE_SIDE_SHADE: 0.72,
+  /** Added on faces pointing up in view space and removed on those pointing down. */
+  OBSTACLE_TOP_LIFT: 0.08,
 
   VIGNETTE_STRENGTH: 0.32,
   GRADE_SATURATION: 1.12,

@@ -199,7 +199,12 @@ export function App(): JSX.Element {
 
   return (
     <>
-      <canvas ref={canvasRef} aria-label={CANVAS_LABEL} tabIndex={-1} />
+      <canvas
+        ref={canvasRef}
+        aria-label={CANVAS_LABEL}
+        tabIndex={-1}
+        onContextMenu={(event) => event.preventDefault()}
+      />
 
       {state === 'PLAYING' && showTouchControls && (
         <TouchControls

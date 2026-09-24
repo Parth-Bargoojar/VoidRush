@@ -8,7 +8,9 @@
  * [PRD 6] Each row of blocks follows the profile's width, height, roll and
  * cross-section: rectangular, polygonal (chamfered corners) or irregular
  * (rough, pillared walls). The wall pattern — scattered lights, light rings,
- * longitudinal stripes or structural ribs — changes between sections.
+ * longitudinal stripes or structural ribs — changes between sections. Under
+ * every pattern the tunnel's corners carry dashed accent guide rails, which
+ * outline the cross-section and make its roll and twist readable at speed.
  *
  * Fairness does not depend on any of this. Every block is placed so that its
  * inner face stays outside the square the player can reach, which is proved
@@ -177,6 +179,10 @@ function buildRow(
   const pattern = shape.pattern;
   const isRibRow = pattern === 'RIBS' && globalRow % TUNNEL.RIB_INTERVAL === 0;
   const isRingRow = pattern === 'RINGS' && globalRow % TUNNEL.RING_INTERVAL === 0;
+  // Negative rows (behind the run start) still dash in phase.
+  const railPhase =
+    ((globalRow % TUNNEL.GUIDE_RAIL_PERIOD) + TUNNEL.GUIDE_RAIL_PERIOD) % TUNNEL.GUIDE_RAIL_PERIOD;
+  const isRailRow = railPhase < TUNNEL.GUIDE_RAIL_DASH;
 
   /* ---- flat walls ------------------------------------------------------ */
   for (let w = 0; w < WALLS.length; w += 1) {
@@ -194,6 +200,9 @@ function buildRow(
       const rPillar = rng();
 
       const along = -tangentExtent + step * (j + 0.5);
+      // Floor and ceiling end blocks sit in the corners and carry the guide
+      // rails. They are held nearly flush, so each rail runs as a straight line.
+      const isCorner = !wall.side && (j === 0 || j === count - 1);
       let protrusion = rProtrusion * maxProtrusion;
       if (shape.roughness > 0 && rPillar < TUNNEL.IRREGULAR_PILLAR_CHANCE) {
         protrusion = maxProtrusion;
@@ -201,6 +210,7 @@ function buildRow(
       if (pattern === 'RIBS') {
         protrusion = isRibRow ? maxProtrusion : Math.min(protrusion, TUNNEL.RIB_FLAT_PROTRUSION);
       }
+      if (isCorner && !isRibRow) protrusion = Math.min(protrusion, TUNNEL.RIB_FLAT_PROTRUSION);
 
       const offset = normalExtent + HALF_BLOCK - protrusion;
       // Local, un-rolled position: normal times offset plus tangent times along.
@@ -224,6 +234,7 @@ function buildRow(
           accent = rAccent < VISUAL.ACCENT_BLOCK_FRACTION;
           break;
       }
+      if (isCorner && isRailRow) accent = true;
 
       pushBlock(out, lx * cos - ly * sin, lx * sin + ly * cos, z, accent, w, roll);
     }
@@ -251,6 +262,8 @@ function buildRow(
     const nx = sx / Math.SQRT2;
     const ny = sy / Math.SQRT2;
     const faceRoll = roll + Math.atan2(sy, sx);
+    // A chamfer hides the corner blocks, so its middle block carries the rail.
+    const railIndex = Math.floor(count / 2);
 
     for (let j = 0; j < count; j += 1) {
       const rProtrusion = rng();
@@ -277,6 +290,7 @@ function buildRow(
           accent = rAccent < VISUAL.ACCENT_BLOCK_FRACTION;
           break;
       }
+      if (j === railIndex && isRailRow) accent = true;
 
       pushBlock(out, lx * cos - ly * sin, lx * sin + ly * cos, z, accent, 4 + q, faceRoll);
     }

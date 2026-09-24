@@ -108,6 +108,17 @@ describe('input manager', () => {
     expect(outside.defaultPrevented).toBe(false);
   });
 
+  it('suppresses context menu only while playing', () => {
+    const during = new MouseEvent('contextmenu', { cancelable: true, bubbles: true });
+    window.dispatchEvent(during);
+    expect(during.defaultPrevented).toBe(true);
+
+    playing = false;
+    const outside = new MouseEvent('contextmenu', { cancelable: true, bubbles: true });
+    window.dispatchEvent(outside);
+    expect(outside.defaultPrevented).toBe(false);
+  });
+
   it('never suppresses keys it does not own', () => {
     const tab = keydown('Tab');
     window.dispatchEvent(tab);

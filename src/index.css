@@ -164,6 +164,13 @@ body[data-state='PLAYING'] {
   touch-action: none;
 }
 
+/* During a run on desktop, hide the mouse cursor so it does not distract the player
+   or block the view of oncoming obstacles. */
+body[data-state='PLAYING'],
+body[data-state='PLAYING'] * {
+  cursor: none !important;
+}
+
 /* Keyboard focus is always visible. [Design 16] */
 :focus-visible {
   outline: 2px solid var(--color-white);

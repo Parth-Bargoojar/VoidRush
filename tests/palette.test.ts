@@ -69,6 +69,25 @@ describe('resolved palettes', () => {
     }
   });
 
+  it('keeps obstacle faces readable under the edge texture interior', () => {
+    // The camera-facing face renders at OBSTACLE_FACE_INTERIOR of the instance
+    // colour (a linear factor, so luminance scales by it directly).
+    const k = VISUAL.OBSTACLE_FACE_INTERIOR;
+    for (const palette of RESOLVED_PALETTES) {
+      const base = relativeLuminance(palette.tunnelBase);
+      for (const tone of [
+        palette.obstaclePrimary,
+        palette.obstacleSecondary,
+        palette.obstacleAccent,
+      ]) {
+        const face = k * relativeLuminance(tone);
+        expect((face + 0.05) / (base + 0.05), `${palette.name} ${hexToCss(tone)}`).toBeGreaterThanOrEqual(
+          VISUAL.MIN_OBSTACLE_CONTRAST,
+        );
+      }
+    }
+  });
+
   it('keeps the background no brighter than the tunnel', () => {
     for (const palette of RESOLVED_PALETTES) {
       expect(relativeLuminance(palette.background)).toBeLessThanOrEqual(
