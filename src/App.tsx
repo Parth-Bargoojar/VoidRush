@@ -19,6 +19,8 @@ import { RotateHint } from './ui/RotateHint';
 import { SettingsMenu } from './ui/SettingsMenu';
 import { TouchControls } from './ui/TouchControls';
 import { CalibrationOverlay } from './ui/CalibrationOverlay';
+import { usePwa } from './pwa/pwa';
+import { UpdateBanner } from './pwa/UpdateBanner';
 import {
   canHover,
   enterFullscreen,
@@ -93,10 +95,12 @@ export function App(): JSX.Element {
   );
 
   const touchDetected = useTouchInput();
+  const { updateReady } = usePwa();
   const tiltSteering = control.active === 'tilt';
   // Tilt replaces the joystick unless the player forced the stick on as well.
   const showTouchControls =
-    (settings.touchControls === 'on' || (settings.touchControls === 'auto' && touchDetected)) &&
+    (settings.touchControls === 'on' ||
+      (settings.touchControls === 'auto' && (touchDetected || control.touchPrimary))) &&
     (!tiltSteering || settings.touchControls === 'on');
 
   // Landscape is suggested on phones and tablets, never required. Turning the
@@ -155,8 +159,7 @@ export function App(): JSX.Element {
   };
 
   // Tilt was wanted but cannot be used: say why, and that touch has taken over.
-  const tiltWanted =
-    settings.controlMode === 'tilt' || (settings.controlMode === 'auto' && control.touchPrimary);
+  const tiltWanted = settings.controlMode === 'tilt';
   const controlNote = !tiltWanted
     ? null
     : control.status === 'denied'
@@ -230,6 +233,7 @@ export function App(): JSX.Element {
           })}
           onSettings={click((instance) => instance.openSettings())}
           onCredits={click((instance) => instance.openCredits())}
+          onInstallClick={() => appRef.current?.playSound('UI_CLICK')}
           onHover={hover}
         />
       )}
@@ -296,6 +300,13 @@ export function App(): JSX.Element {
           }}
         />
       )}
+
+      {/* Only on safe screens: an update never lands over an active run. */}
+      {updateReady &&
+        calibration === null &&
+        (state === 'MENU' || state === 'PAUSED' || state === 'GAME_OVER') && (
+          <UpdateBanner midRun={state === 'PAUSED'} />
+        )}
 
       {rotateSuggested && !rotateDismissed && state !== 'PLAYING' && calibration === null && (
         <RotateHint

@@ -45,11 +45,18 @@ describe('control mode selection', () => {
     }
   });
 
-  it('AUTO picks tilt on a phone or tablet that can provide it', () => {
-    expect(resolveControlMode('auto', { touchPrimary: true, tilt: 'active' })).toBe('tilt');
-    expect(resolveControlMode('auto', { touchPrimary: true, tilt: 'off' })).toBe('tilt');
-    // iOS before the tap: tilt is still the plan; PLAY will ask.
+  it('AUTO defaults to joystick on a phone or tablet, not tilt', () => {
+    expect(resolveControlMode('auto', { touchPrimary: true, tilt: 'active' })).toBe('keyboard');
+    expect(resolveControlMode('auto', { touchPrimary: true, tilt: 'off' })).toBe('keyboard');
     expect(resolveControlMode('auto', { touchPrimary: true, tilt: 'needs-permission' })).toBe(
+      'keyboard',
+    );
+  });
+
+  it('TILT explicitly picks tilt on a phone or tablet that can provide it', () => {
+    expect(resolveControlMode('tilt', { touchPrimary: true, tilt: 'active' })).toBe('tilt');
+    expect(resolveControlMode('tilt', { touchPrimary: true, tilt: 'off' })).toBe('tilt');
+    expect(resolveControlMode('tilt', { touchPrimary: true, tilt: 'needs-permission' })).toBe(
       'tilt',
     );
   });

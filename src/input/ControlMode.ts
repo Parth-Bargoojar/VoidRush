@@ -25,19 +25,20 @@ export function tiltUsable(status: TiltStatus): boolean {
 }
 
 /**
- * AUTO picks tilt on a phone or tablet that can provide it, and the keyboard
- * (with the joystick on touchscreens) everywhere else. TILT asks for tilt
- * wherever it is usable, including a touchscreen laptop, and falls back to the
- * keyboard when it is not, so the game is never left without steering.
+ * AUTO picks the joystick on a phone or tablet, and the keyboard on desktop.
+ * TILT asks for tilt wherever it is usable, and falls back to the keyboard/joystick
+ * when it is not, so the game is never left without steering.
  */
 export function resolveControlMode(
   preference: ControlMode,
   capabilities: ControlCapabilities,
 ): ActiveControl {
   if (preference === 'keyboard') return 'keyboard';
-  if (!tiltUsable(capabilities.tilt)) return 'keyboard';
-  if (preference === 'tilt') return 'tilt';
-  return capabilities.touchPrimary ? 'tilt' : 'keyboard';
+  if (preference === 'tilt') {
+    return tiltUsable(capabilities.tilt) ? 'tilt' : 'keyboard';
+  }
+  // AUTO: Default on mobile is the joystick, and keyboard on desktop.
+  return 'keyboard';
 }
 
 /**

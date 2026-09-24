@@ -751,3 +751,148 @@ Still to do on hardware:
 5. **Frame rate with tilt active** on mid-range phones. The event handler
    allocates nothing and React is not involved, but nothing has been measured
    on device.
+
+---
+
+## 24. Progressive Web App (2026-09-24)
+
+VOIDRUSH is now an installable PWA. The website is unchanged for visitors who
+do not install it. The PWA layer wraps the app and never touches the engine,
+the render loop or input.
+
+### Stack
+
+- **`vite-plugin-pwa` 1.3.0** (devDependency, `generateSW` mode, Workbox 7.4).
+  Configured in `vite.config.ts`. It is the only dependency added.
+- The service worker is **production-only** (`devOptions.enabled: false`, and
+  registration is guarded by `import.meta.env.PROD`). `npm run dev` never
+  registers a worker, so localhost is never controlled by a stale cache.
+  Test with `npm run build && npm run preview`.
+
+### Manifest (generated to `dist/manifest.webmanifest`)
+
+- `name`/`short_name`: VOIDRUSH. `display`: standalone. `orientation`: landscape.
+- `start_url`, `scope` and `id` are `./`, which is relative to the manifest,
+  so they resolve to `/` on the root Vercel deploy and stay correct under a
+  sub-path (the build uses `base: './'`).
+- `theme_color`/`background_color`: `#080a0f` (Design.md `--color-bg`).
+- Icons: PNG 192/512 `any`, PNG 192/512 `maskable`, SVG `any`.
+- The old hand-written `public/manifest.webmanifest` was removed. It used
+  `display: fullscreen` and a single SVG icon that Android and iOS cannot use
+  as a launcher icon.
+
+### Icons
+
+- Sources: `public/icon.svg` (the existing brand mark, unchanged) and
+  `public/icon-maskable.svg` (the same art scaled to 0.7, so its corners sit
+  inside the 40%-radius maskable safe circle).
+- `public/icons/`: `icon-192.png`, `icon-512.png`, `icon-maskable-192.png`,
+  `icon-maskable-512.png`, `apple-touch-icon-180.png` (uses the safe-zone
+  art, because iOS rounds the corners), `favicon-32.png`.
+- Regenerate with `npm run icons` (`scripts/generate-icons.ts`, which
+  rasterises through the Playwright Chromium already in devDependencies, so
+  no image library is needed).
+
+### Caching
+
+- **Precache** (revisioned, atomic per deploy): every build JS/CSS chunk,
+  `index.html`, the manifest, icons and `robots.txt`. That is about 27
+  entries and 815 KiB. The game has no other assets: fonts are a local system
+  stack and all sound is synthesised.
+- **Runtime `CacheFirst` `voidrush-audio`**: only the optional
+  `public/soundtrack.mp3` (and other same-origin audio). It plays through
+  `<audio>`, which uses range requests, so it is cached on first play and
+  served with `rangeRequests`. Only 200 responses are cached, with at most 4
+  entries and a 30-day expiry.
+- **Navigation fallback**: `index.html` for the app URL with any query
+  (`/`, `/index.html`, `/?seed=…`). Other paths are not app pages; with
+  relative asset URLs the shell could not load there, and online they 404.
+- Nothing cross-origin is cached. The game makes no external requests.
+- `cleanupOutdatedCaches` removes caches from earlier Workbox versions.
+  Hashed chunks from old deploys drop out of the precache when the new
+  worker activates.
+- `vercel.json`: `sw.js`, `workbox-*.js`, `manifest.webmanifest` and `/`
+  are served `max-age=0, must-revalidate`. Hashed `/assets/*` stay immutable.
+
+### Updates
+
+- `registerType: 'prompt'`, `skipWaiting: false`, `clientsClaim: false`. A
+  new deploy installs in the background and waits.
+- The page checks for updates hourly and whenever the tab becomes visible,
+  but only while online.
+- The `UPDATE AVAILABLE` banner (`src/pwa/UpdateBanner.tsx`) renders only on
+  MENU, PAUSED and GAME_OVER, never during PLAYING or calibration. On pause,
+  it warns that updating ends the run. "Later" hides it for the session.
+- UPDATE sends SKIP_WAITING and reloads **once**, on `controlling`. The QA
+  script verified exactly one navigation.
+
+### Install
+
+- `src/pwa/pwa.ts` captures `beforeinstallprompt` before React mounts
+  (`initPwa()` in `main.tsx`). This suppresses Chromium's mini-infobar. It
+  also tracks `appinstalled` and `display-mode: standalone`.
+- `src/pwa/InstallAction.tsx`: a small dashed "Install VOIDRUSH" button under
+  the main-menu actions. It shows only when Chromium has offered a prompt or
+  when running on iOS/iPadOS (iPadOS detected as a Mac with touch), and never
+  when already installed. It never pops up unprompted.
+- iOS/iPadOS has no programmatic install. Tapping the button opens a short
+  Share → Add to Home Screen guide in the existing `Modal`.
+- Apple meta tags (`apple-mobile-web-app-capable`, `black-translucent` status
+  bar, title) were already present. The apple-touch-icon is now a 180 px PNG.
+
+### Rendering and runtime
+
+- React subscribes to the PWA store with `useSyncExternalStore`, and it
+  changes only on SW or install events. There is no polling and nothing in
+  the render loop.
+- An inline `<style>` in `index.html` paints `#080a0f` before the stylesheet
+  loads, so an installed launch never flashes white. The existing `.boot`
+  "INITIALIZING..." surface is unchanged.
+- The existing `100dvh`, safe-area variables, resize handling, rotate hint,
+  fullscreen/landscape lock and gyroscope permission flow (motion access is
+  requested only from PLAY) were already PWA-ready and are unchanged.
+  Persistence (`voidrush-settings`, `voidrush-stats` in localStorage) is
+  unchanged. An installed app shares its origin's storage on Android and
+  desktop. iOS home-screen apps get their own storage, separate from Safari.
+
+### Files
+
+- New: `src/pwa/pwa.ts`, `src/pwa/UpdateBanner.tsx`,
+  `src/pwa/InstallAction.tsx`, `public/icon-maskable.svg`, `public/icons/*`,
+  `scripts/generate-icons.ts`, `scripts/pwa-qa.ts`.
+- Modified: `vite.config.ts`, `index.html`, `src/main.tsx`, `src/App.tsx`,
+  `src/ui/MainMenu.tsx`, `src/ui/ui.css`, `src/globals.d.ts`, `vercel.json`,
+  `package.json` (scripts `icons`, `e2e:pwa`).
+- Removed: `public/manifest.webmanifest`, which the plugin now generates.
+
+### Verification
+
+- `npm run e2e:pwa` passed **42/42** against `vite preview` in headless
+  Chromium: manifest fields; icon files and pixel sizes; Chromium's own CDP
+  `Page.getInstallabilityErrors` (none); SW activation; precache contents;
+  control after reload; offline relaunch and offline query-URL launch;
+  settings persisting across offline relaunch; an offline run with WASD and
+  Esc pause; a simulated redeploy (`sw.js` changed) that waits, shows no
+  banner during the run, shows the banner on pause, and reloads exactly once
+  into the new worker; canvas resize; no install button without a prompt;
+  the iOS install action and guide; portrait boot and rotate hint; zero
+  console errors.
+- `npm test` (272), `npm run lint`, `npm run build`, `browser-qa` and
+  `mobile-qa` (the gyroscope flows) all pass unchanged.
+- Not run: Lighthouse, whose PWA category was removed in Lighthouse 12. The
+  CDP installability check was used instead.
+
+### Physical-device testing still required
+
+None of this was tested on a real device. It all ran in emulation.
+
+- **Android Chrome:** install prompt; home-screen icon (maskable crop);
+  standalone launch; landscape; gyroscope; offline launch; persistence;
+  update banner.
+- **iPhone Safari:** Add to Home Screen; icon; standalone launch and status
+  bar; landscape; the motion permission from PLAY inside the home-screen app;
+  offline launch; persistence (separate from Safari).
+- **iPad:** the same as iPhone, plus iPadOS desktop-UA detection of the
+  install guide.
+- **Desktop Chrome/Edge:** install from the menu button or the address bar;
+  standalone window; WASD; resize; offline launch; update.

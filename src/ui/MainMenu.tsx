@@ -8,6 +8,7 @@ import { Info, Maximize, Minimize, Play, Settings } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { JoystickSide, PersistedStats } from '../types';
 import { formatNumber, formatTime } from '../utils/MathUtils';
+import { InstallAction } from '../pwa/InstallAction';
 import { fullscreenSupported, toggleFullscreen, useFullscreen } from './device';
 
 interface MainMenuProps {
@@ -22,6 +23,7 @@ interface MainMenuProps {
   onPlay: () => void;
   onSettings: () => void;
   onCredits: () => void;
+  onInstallClick: () => void;
   onHover: () => void;
 }
 
@@ -34,6 +36,7 @@ export function MainMenu({
   onPlay,
   onSettings,
   onCredits,
+  onInstallClick,
   onHover,
 }: MainMenuProps): JSX.Element {
   const playRef = useRef<HTMLButtonElement>(null);
@@ -102,6 +105,8 @@ export function MainMenu({
               Credits
             </button>
           </div>
+
+          <InstallAction onHover={onHover} onClick={onInstallClick} />
         </div>
 
         {stats.bestScore > 0 && (

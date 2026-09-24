@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Maskable variant of icon.svg: the full-bleed background survives any
+       launcher crop, and the art is scaled to 0.7 so its outer square corners
+       stay inside the 40%-radius safe circle (circles, squircles, teardrops). -->
+  <rect width="512" height="512" fill="#080a0f"/>
+  <g transform="translate(256 256) scale(0.7) translate(-256 -256)">
+    <g fill="none" stroke-linejoin="miter">
+      <rect x="64" y="64" width="384" height="384" stroke="#303844" stroke-width="16"/>
+      <rect x="136" y="136" width="240" height="240" stroke="#566171" stroke-width="16"/>
+      <rect x="200" y="200" width="112" height="112" stroke="#38cfff" stroke-width="16"/>
+    </g>
+    <rect x="240" y="240" width="32" height="32" fill="#ffffff"/>
+  </g>
+</svg>

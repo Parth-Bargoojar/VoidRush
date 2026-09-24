@@ -585,9 +585,7 @@ export class VoidrushApp {
    * steer (false after a refusal, and the game falls back to touch or keys).
    */
   prepareTilt(): Promise<boolean> | null {
-    const wanted =
-      this.settings.controlMode === 'tilt' ||
-      (this.settings.controlMode === 'auto' && this.touchPrimary);
+    const wanted = this.settings.controlMode === 'tilt';
     if (!wanted || !tiltUsable(this.tilt.status)) return null;
     const access = this.tilt.needsPermission ? this.tilt.requestPermission() : Promise.resolve(true);
     return access.then((granted) => {

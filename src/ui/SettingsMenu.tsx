@@ -93,6 +93,7 @@ interface ChoiceProps<T extends string> {
   hint?: string;
   options: readonly T[];
   value: T;
+  formatOption?: (value: T) => string;
   onChange: (value: T) => void;
   onHover: () => void;
 }
@@ -102,6 +103,7 @@ function Choice<T extends string>({
   hint,
   options,
   value,
+  formatOption,
   onChange,
   onHover,
 }: ChoiceProps<T>): JSX.Element {
@@ -123,7 +125,7 @@ function Choice<T extends string>({
             onClick={() => onChange(option)}
             onMouseEnter={onHover}
           >
-            {option}
+            {formatOption ? formatOption(option) : option}
           </button>
         ))}
       </div>
@@ -375,154 +377,170 @@ export function SettingsMenu({
                 label="Control mode"
                 hint={
                   settings.controlMode === 'auto'
-                    ? `Auto: tilt on phones and tablets, keyboard elsewhere. Now using ${control.active}.`
-                    : settings.controlMode !== control.active
-                      ? `Tilt is not available here, so the keyboard and touch steer instead.`
-                      : undefined
+                    ? (control.touchPrimary
+                        ? 'Auto: touch joystick on mobile, keyboard on desktop.'
+                        : 'Auto: keyboard on desktop, touch joystick on mobile.')
+                    : settings.controlMode === 'tilt'
+                      ? (settings.controlMode !== control.active
+                          ? 'Tilt is not available here, so touch joystick steers instead.'
+                          : 'Tilt: steer by tilting your device.')
+                      : (control.touchPrimary
+                          ? 'Joystick: steer with on-screen stick.'
+                          : 'Keyboard: steer with W/A/S/D or arrow keys.')
                 }
                 options={CONTROL_MODES}
                 value={settings.controlMode}
+                formatOption={(mode) => {
+                  if (mode === 'keyboard' && control.touchPrimary) return 'joystick';
+                  return mode;
+                }}
                 onChange={(controlMode) => onChange({ controlMode })}
                 onHover={onHover}
               />
             </Section>
 
-            <Section title="Tilt">
-              <div className="field">
-                <p className="tilt-status" data-status={control.status} role="status">
-                  <Smartphone size={16} strokeWidth={2} aria-hidden="true" />
-                  <span>{tiltStatusText(control.status, control)}</span>
-                </p>
-                <div className="tilt-actions">
-                  {canEnableTilt && (
+            {settings.controlMode === 'tilt' ? (
+              <Section title="Tilt">
+                <div className="field">
+                  <p className="tilt-status" data-status={control.status} role="status">
+                    <Smartphone size={16} strokeWidth={2} aria-hidden="true" />
+                    <span>{tiltStatusText(control.status, control)}</span>
+                  </p>
+                  <div className="tilt-actions">
+                    {canEnableTilt && (
+                      <button
+                        type="button"
+                        className="button button--secondary"
+                        onClick={onEnableTilt}
+                        onMouseEnter={onHover}
+                      >
+                        <Smartphone size={18} strokeWidth={2} aria-hidden="true" />
+                        {control.status === 'unavailable' ? 'Retry tilt' : 'Enable tilt'}
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="button button--secondary"
-                      onClick={onEnableTilt}
+                      onClick={onRecalibrate}
                       onMouseEnter={onHover}
+                      disabled={!tiltSteering}
                     >
-                      <Smartphone size={18} strokeWidth={2} aria-hidden="true" />
-                      {control.status === 'unavailable' ? 'Retry tilt' : 'Enable tilt'}
+                      <Crosshair size={18} strokeWidth={2} aria-hidden="true" />
+                      Recalibrate tilt
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    className="button button--secondary"
-                    onClick={onRecalibrate}
-                    onMouseEnter={onHover}
-                    disabled={!tiltSteering}
-                  >
-                    <Crosshair size={18} strokeWidth={2} aria-hidden="true" />
-                    Recalibrate tilt
-                  </button>
+                  </div>
                 </div>
-              </div>
-              <Slider
-                label="Tilt sensitivity"
-                hint={`Full speed at about ${Math.round(TILT.MAX_TILT / settings.tiltSensitivity)}° of tilt.`}
-                value={settings.tiltSensitivity}
-                min={TILT.SENSITIVITY_MIN}
-                max={TILT.SENSITIVITY_MAX}
-                step={0.05}
-                format={times}
-                onChange={(tiltSensitivity) => onChange({ tiltSensitivity })}
-              />
-              <Slider
-                label="Tilt dead zone"
-                hint="Tilt this small is ignored, so a steady hand holds a steady line."
-                value={settings.tiltDeadZone}
-                min={TILT.DEAD_ZONE_MIN}
-                max={TILT.DEAD_ZONE_MAX}
-                step={0.5}
-                format={(v) => `${v.toFixed(1)}°`}
-                onChange={(tiltDeadZone) => onChange({ tiltDeadZone })}
-              />
-              <Switch
-                label="Invert horizontal"
-                checked={settings.tiltInvertX}
-                onChange={(tiltInvertX) => onChange({ tiltInvertX })}
-                onHover={onHover}
-              />
-              <Switch
-                label="Invert vertical"
-                hint="Off: tip the top edge away to climb. On: flight-stick style, tip away to dive."
-                checked={settings.tiltInvertY}
-                onChange={(tiltInvertY) => onChange({ tiltInvertY })}
-                onHover={onHover}
-              />
-            </Section>
+                <Slider
+                  label="Tilt sensitivity"
+                  hint={`Full speed at about ${Math.round(TILT.MAX_TILT / settings.tiltSensitivity)}° of tilt.`}
+                  value={settings.tiltSensitivity}
+                  min={TILT.SENSITIVITY_MIN}
+                  max={TILT.SENSITIVITY_MAX}
+                  step={0.05}
+                  format={times}
+                  onChange={(tiltSensitivity) => onChange({ tiltSensitivity })}
+                />
+                <Slider
+                  label="Tilt dead zone"
+                  hint="Tilt this small is ignored, so a steady hand holds a steady line."
+                  value={settings.tiltDeadZone}
+                  min={TILT.DEAD_ZONE_MIN}
+                  max={TILT.DEAD_ZONE_MAX}
+                  step={0.5}
+                  format={(v) => `${v.toFixed(1)}°`}
+                  onChange={(tiltDeadZone) => onChange({ tiltDeadZone })}
+                />
+                <Switch
+                  label="Invert horizontal"
+                  checked={settings.tiltInvertX}
+                  onChange={(tiltInvertX) => onChange({ tiltInvertX })}
+                  onHover={onHover}
+                />
+                <Switch
+                  label="Invert vertical"
+                  hint="Off: tip the top edge away to climb. On: flight-stick style, tip away to dive."
+                  checked={settings.tiltInvertY}
+                  onChange={(tiltInvertY) => onChange({ tiltInvertY })}
+                  onHover={onHover}
+                />
+              </Section>
+            ) : (
+              <>
+                <Section title="Touch joystick">
+                  <Choice
+                    label="On-screen joystick"
+                    hint="Auto shows it whenever you play with a touchscreen."
+                    options={TOUCH_CONTROL_MODES}
+                    value={settings.touchControls}
+                    onChange={(touchControls) => onChange({ touchControls })}
+                    onHover={onHover}
+                  />
+                  <Choice
+                    label="Style"
+                    hint={
+                      settings.joystickMode === 'dynamic'
+                        ? 'Appears under your thumb anywhere on its half of the screen, then holds still while you steer.'
+                        : 'Stays in the corner; start your drag on the stick.'
+                    }
+                    options={JOYSTICK_MODES}
+                    value={settings.joystickMode}
+                    onChange={(joystickMode) => onChange({ joystickMode })}
+                    onHover={onHover}
+                  />
+                  <Choice
+                    label="Hand"
+                    options={JOYSTICK_SIDES}
+                    value={settings.joystickSide}
+                    onChange={(joystickSide) => onChange({ joystickSide })}
+                    onHover={onHover}
+                  />
+                  <Slider
+                    label="Joystick size"
+                    value={settings.joystickSize}
+                    min={JOYSTICK_SIZE_MIN}
+                    max={JOYSTICK_SIZE_MAX}
+                    step={0.05}
+                    format={percent}
+                    onChange={(joystickSize) => onChange({ joystickSize })}
+                  />
+                  <Switch
+                    label="Vibration"
+                    hint={canVibrate ? 'Pulses on near misses and impacts.' : 'Not supported on this device.'}
+                    checked={settings.haptics && canVibrate}
+                    disabled={!canVibrate}
+                    onChange={(haptics) => onChange({ haptics })}
+                    onHover={onHover}
+                  />
+                </Section>
 
-            <Section title="Touch joystick">
-              <Choice
-                label="On-screen joystick"
-                hint="Auto shows it whenever you play with a touchscreen."
-                options={TOUCH_CONTROL_MODES}
-                value={settings.touchControls}
-                onChange={(touchControls) => onChange({ touchControls })}
-                onHover={onHover}
-              />
-              <Choice
-                label="Style"
-                hint={
-                  settings.joystickMode === 'dynamic'
-                    ? 'Appears under your thumb anywhere on its half of the screen, then holds still while you steer.'
-                    : 'Stays in the corner; start your drag on the stick.'
-                }
-                options={JOYSTICK_MODES}
-                value={settings.joystickMode}
-                onChange={(joystickMode) => onChange({ joystickMode })}
-                onHover={onHover}
-              />
-              <Choice
-                label="Hand"
-                options={JOYSTICK_SIDES}
-                value={settings.joystickSide}
-                onChange={(joystickSide) => onChange({ joystickSide })}
-                onHover={onHover}
-              />
-              <Slider
-                label="Joystick size"
-                value={settings.joystickSize}
-                min={JOYSTICK_SIZE_MIN}
-                max={JOYSTICK_SIZE_MAX}
-                step={0.05}
-                format={percent}
-                onChange={(joystickSize) => onChange({ joystickSize })}
-              />
-              <Switch
-                label="Vibration"
-                hint={canVibrate ? 'Pulses on near misses and impacts.' : 'Not supported on this device.'}
-                checked={settings.haptics && canVibrate}
-                disabled={!canVibrate}
-                onChange={(haptics) => onChange({ haptics })}
-                onHover={onHover}
-              />
-            </Section>
-
-            <Section title="Keyboard">
-              <ul className="keymap">
-                <li>
-                  <span className="keymap__keys">
-                    <kbd>W</kbd>
-                    <kbd>A</kbd>
-                    <kbd>S</kbd>
-                    <kbd>D</kbd>
-                    <span className="keymap__or">or</span>
-                    <kbd>↑</kbd>
-                    <kbd>←</kbd>
-                    <kbd>↓</kbd>
-                    <kbd>→</kbd>
-                  </span>
-                  <span>Steer</span>
-                </li>
-                <li>
-                  <span className="keymap__keys">
-                    <kbd>Esc</kbd>
-                  </span>
-                  <span>Pause · back</span>
-                </li>
-              </ul>
-            </Section>
+                {!control.touchPrimary && (
+                  <Section title="Keyboard">
+                    <ul className="keymap">
+                      <li>
+                        <span className="keymap__keys">
+                          <kbd>W</kbd>
+                          <kbd>A</kbd>
+                          <kbd>S</kbd>
+                          <kbd>D</kbd>
+                          <span className="keymap__or">or</span>
+                          <kbd>↑</kbd>
+                          <kbd>←</kbd>
+                          <kbd>↓</kbd>
+                          <kbd>→</kbd>
+                        </span>
+                        <span>Steer</span>
+                      </li>
+                      <li>
+                        <span className="keymap__keys">
+                          <kbd>Esc</kbd>
+                        </span>
+                        <span>Pause · back</span>
+                      </li>
+                    </ul>
+                  </Section>
+                )}
+              </>
+            )}
           </>
         )}
 
