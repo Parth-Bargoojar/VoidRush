@@ -1,0 +1,19 @@
+node_modules/
+dist/
+artifacts/
+
+# Local environment and machine-specific settings
+.env
+.env.*
+!.env.example
+*.local
+.vercel/
+.claude/settings.local.json
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-error.log*

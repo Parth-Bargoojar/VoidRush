@@ -1,0 +1,159 @@
+/**
+ * VOIDRUSH — design tokens and global styles.
+ *
+ * Tokens are taken verbatim from Design.md section 21. No screen invents its
+ * own colour, spacing, radius or type scale.
+ *
+ * Inter is named first but not bundled: the project ships zero external assets
+ * so the built game runs offline from static files, and Design.md's own
+ * fallback stack takes over when Inter is not installed.
+ */
+
+:root {
+  /* Colour */
+  --color-bg: #080a0f;
+  --color-surface: #10141b;
+  --color-surface-elevated: #171c24;
+  --color-border: #303844;
+  --color-border-strong: #566171;
+
+  --color-text-primary: #f5f7fa;
+  --color-text-secondary: #aab2be;
+  --color-text-muted: #6e7785;
+
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-success: #39e58c;
+  --color-warning: #ffd447;
+  --color-error: #ff3d4f;
+  --color-info: #38cfff;
+
+  /* Spacing, on a 4px base */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+
+  /* Radius */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-full: 9999px;
+
+  /* Elevation */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.45);
+
+  /* Motion */
+  --duration-micro: 100ms;
+  --duration-fast: 180ms;
+  --duration-standard: 250ms;
+  --duration-medium: 400ms;
+  --duration-slow: 700ms;
+  --ease-default: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Layering */
+  --z-canvas: 0;
+  --z-effects: 1;
+  --z-hud: 10;
+  --z-notifications: 20;
+  --z-overlay: 50;
+  --z-modal: 100;
+  --z-critical: 200;
+
+  --font-sans: Inter, 'Segoe UI', Roboto, Arial, Helvetica, sans-serif;
+  --hud-margin: var(--space-8);
+}
+
+@media (max-width: 1023px) {
+  :root {
+    /* [Design 6] Compact desktop tightens HUD margins. */
+    --hud-margin: var(--space-4);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-feature-settings: 'tnum' 1;
+  overflow: hidden;
+  /* WASD and the arrow keys must never scroll the page. */
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+canvas {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-canvas);
+  outline: none;
+}
+
+/* Keyboard focus is always visible. [Design 16] */
+:focus-visible {
+  outline: 2px solid var(--color-white);
+  outline-offset: 2px;
+}
+
+.boot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--space-4);
+}
+
+.boot__title {
+  font-size: 64px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.boot__subtitle {
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  color: var(--color-text-muted);
+}
+
+/*
+ * [Design 15] Reduced motion applies to interface transitions only. Gameplay
+ * motion is the game and cannot be disabled.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
