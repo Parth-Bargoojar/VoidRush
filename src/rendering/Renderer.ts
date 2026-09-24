@@ -67,7 +67,7 @@ export class Renderer {
   private readonly post: PostProcessing;
   private readonly fog: Fog;
 
-  private quality: QualityLevel = 'medium';
+  private quality: QualityLevel = 'high';
   /** The player's Visual intensity setting, in [0, 1]. */
   private visualIntensityScale = 1;
   private palette: ResolvedPalette;

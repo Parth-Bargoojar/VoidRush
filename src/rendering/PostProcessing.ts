@@ -117,7 +117,7 @@ export class PostProcessing {
   private readabilityBudget = 1;
   /** Difficulty × the Visual intensity setting, in [0, 1]. */
   private visualIntensity = 0;
-  private quality: QualityLevel = 'medium';
+  private quality: QualityLevel = 'high';
   private overloadPhase = 0;
   private overloadClock = 0;
   private width = 1;

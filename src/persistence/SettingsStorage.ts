@@ -41,9 +41,9 @@ export const CONTROL_MODES: readonly ControlMode[] = ['auto', 'keyboard', 'tilt'
  */
 export const SETTINGS_VERSION = 2;
 
-/** [TRD] Medium is the default quality level. */
+/** High is the default quality level. */
 export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
-  quality: 'medium' as QualityLevel,
+  quality: 'high' as QualityLevel,
   masterVolume: 1,
   musicVolume: 0.8,
   sfxVolume: 1,
