@@ -99,12 +99,49 @@ describe('score system', () => {
     expect(state.score - before).toBe(SCORE.SURVIVAL_PER_SECOND);
   });
 
-  it('tracks the maximum combo and resets cleanly', () => {
+  it('tracks the longest streak as the max combo and resets cleanly', () => {
     const state = createScoreState();
     for (let i = 0; i < 21; i += 1) registerClear(state, 'RING');
-    expect(state.maxCombo).toBe(6);
+    expect(state.maxCombo).toBe(21);
+    // The score multiplier is still tiered and capped.
+    expect(state.combo).toBe(COMBO.MAX_MULTIPLIER);
     resetScoreState(state);
     expect(state).toEqual(createScoreState());
+  });
+});
+
+describe('visible combo', () => {
+  it('goes up by exactly one for every obstacle cleared', () => {
+    const state = createScoreState();
+    for (let i = 1; i <= 30; i += 1) {
+      expect(registerClear(state, 'STATIC_GATE').combo).toBe(i);
+      expect(state.consecutiveClears).toBe(i);
+    }
+  });
+
+  it('flags a notification every NOTIFY_EVERY clears and nowhere else', () => {
+    const state = createScoreState();
+    for (let i = 1; i <= 20; i += 1) {
+      expect(registerClear(state, 'STATIC_GATE').milestone).toBe(i % COMBO.NOTIFY_EVERY === 0);
+    }
+  });
+
+  it('never plays the combo sound during a run', () => {
+    const game = new Game({ seed: 11 });
+    const sounds: string[] = [];
+    let notifications = 0;
+    game.setHooks({
+      onSound: (id) => sounds.push(id),
+      onComboMilestone: () => {
+        notifications += 1;
+      },
+    });
+    game.startRun(11);
+    runBot(game, new AutopilotBot(11), 150);
+    expect(game.score.obstaclesCleared).toBeGreaterThan(COMBO.NOTIFY_EVERY);
+    expect(notifications).toBeGreaterThan(0);
+    expect(sounds).not.toContain('COMBO_UP');
+    expect(sounds).not.toContain('OBSTACLE_PASS');
   });
 });
 

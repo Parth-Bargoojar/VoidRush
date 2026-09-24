@@ -8,9 +8,14 @@
  * The multiplier applied to a pass is the one in force *before* that pass, which
  * is what the PRD's worked example shows: three passes at +100, then x2, then
  * +200.
+ *
+ * Two different numbers come out of a streak and they must not be confused:
+ * the combo the player sees is the streak itself (+1 per cleared obstacle),
+ * while the score multiplier steps up in tiers and caps at x6.
  */
 
 import {
+  COMBO,
   NEAR_MISS_REWARD,
   OBSTACLE_WEIGHTS,
   SCORE,
@@ -25,7 +30,7 @@ export function createScoreState(): ScoreState {
     score: 0,
     combo: 1,
     consecutiveClears: 0,
-    maxCombo: 1,
+    maxCombo: 0,
     obstaclesCleared: 0,
     nearMisses: 0,
     survivalMultiplier: 1,
@@ -59,7 +64,7 @@ export function resetScoreState(state: ScoreState): void {
   state.score = 0;
   state.combo = 1;
   state.consecutiveClears = 0;
-  state.maxCombo = 1;
+  state.maxCombo = 0;
   state.obstaclesCleared = 0;
   state.nearMisses = 0;
   state.survivalMultiplier = 1;
@@ -67,8 +72,9 @@ export function resetScoreState(state: ScoreState): void {
 
 export interface ClearAward {
   points: number;
-  /** The multiplier after this clear, for the HUD. */
+  /** The streak after this clear: the combo shown to the player. */
   combo: number;
+  /** True every COMBO.NOTIFY_EVERY clears, for the HUD notification. */
   milestone: boolean;
 }
 
@@ -83,12 +89,11 @@ export function registerClear(state: ScoreState, type: ObstacleType): ClearAward
   state.obstaclesCleared += 1;
   state.consecutiveClears += 1;
 
-  const next = comboMultiplier(state.consecutiveClears);
-  const milestone = next > multiplier;
-  state.combo = next;
-  if (next > state.maxCombo) state.maxCombo = next;
+  state.combo = comboMultiplier(state.consecutiveClears);
+  const streak = state.consecutiveClears;
+  if (streak > state.maxCombo) state.maxCombo = streak;
 
-  return { points, combo: next, milestone };
+  return { points, combo: streak, milestone: streak % COMBO.NOTIFY_EVERY === 0 };
 }
 
 /** [PRD 15] Awards a near miss. At most one per obstacle; the caller enforces that. */

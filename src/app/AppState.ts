@@ -28,6 +28,10 @@ import { now } from '../utils/Timing';
 import type { GameState, NearMissTier, PersistedStats, RunStats, Settings } from '../types';
 import { GameBridge } from './GameBridge';
 
+/** Vibration lengths in ms. Kept short: feedback, not a buzz. */
+const HAPTIC_NEAR_MISS_MS = 12;
+const HAPTIC_COLLISION: readonly number[] = [45, 40, 90];
+
 export interface AppListener {
   onStateChange: (state: GameState) => void;
   onSettingsChange: (settings: Settings) => void;
@@ -61,6 +65,9 @@ export class VoidrushApp {
   private lastRun: RunStats | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private windowResizeHandler: (() => void) | null = null;
+  private orientationHandler: (() => void) | null = null;
+  private orientationTimer: ReturnType<typeof setTimeout> | null = null;
+  private firstTouchHandler: (() => void) | null = null;
   private seedOverride: number | null;
   private runSeed = 1;
   private disposed = false;
@@ -79,7 +86,10 @@ export class VoidrushApp {
       sensitivity: this.settings.movementSensitivity,
     });
     this.game.setHooks({
-      onSound: (id) => this.audio.play(id),
+      onSound: (id) => {
+        this.audio.play(id);
+        this.haptic(id);
+      },
       onShake: (amount) => this.renderer?.cameraController.addShake(amount),
       onNearMiss: (tier, points) => this.onNearMiss(tier, points),
       onComboMilestone: (multiplier) =>
@@ -131,13 +141,30 @@ export class VoidrushApp {
 
     this.windowResizeHandler = (): void => this.applyViewportSize();
     window.addEventListener('resize', this.windowResizeHandler);
+    // iOS reports the old size for a moment after rotating, so measure again
+    // once the rotation has settled.
+    this.orientationHandler = (): void => {
+      if (this.orientationTimer !== null) clearTimeout(this.orientationTimer);
+      this.orientationTimer = setTimeout(() => {
+        this.orientationTimer = null;
+        this.applyViewportSize();
+      }, 300);
+    };
+    window.addEventListener('orientationchange', this.orientationHandler);
+    // Mobile Safari only lets audio start inside a touch handler itself, so the
+    // first touch anywhere unlocks it synchronously.
+    this.firstTouchHandler = (): void => {
+      this.detachFirstTouch();
+      if (!this.disposed) this.gesture();
+    };
+    window.addEventListener('touchend', this.firstTouchHandler, { passive: true });
     if (typeof ResizeObserver !== 'undefined') {
       this.resizeObserver = new ResizeObserver(() => this.applyViewportSize());
       this.resizeObserver.observe(canvas);
     }
 
     this.input = new InputManager({
-      onPauseToggle: () => this.togglePause(),
+      onPauseToggle: () => this.handleEscape(),
       // [§9.4] Losing focus or visibility forces a pause.
       onBlur: () => this.pauseForBlur(),
       isPlaying: () => this.machine.state === 'PLAYING',
@@ -173,12 +200,27 @@ export class VoidrushApp {
       window.removeEventListener('resize', this.windowResizeHandler);
       this.windowResizeHandler = null;
     }
+    if (this.orientationHandler) {
+      window.removeEventListener('orientationchange', this.orientationHandler);
+      this.orientationHandler = null;
+    }
+    if (this.orientationTimer !== null) {
+      clearTimeout(this.orientationTimer);
+      this.orientationTimer = null;
+    }
+    this.detachFirstTouch();
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
     this.audio.dispose();
     this.renderer?.dispose();
     this.renderer = null;
     this.listener = null;
+  }
+
+  private detachFirstTouch(): void {
+    if (!this.firstTouchHandler) return;
+    window.removeEventListener('touchend', this.firstTouchHandler);
+    this.firstTouchHandler = null;
   }
 
   private applyViewportSize(): void {
@@ -232,7 +274,8 @@ export class VoidrushApp {
     this.bridge.publish(
       {
         score: this.game.score.score,
-        combo: this.game.score.combo,
+        // The streak, not the score multiplier: +1 for every obstacle cleared.
+        combo: this.game.score.consecutiveClears,
         speed: this.game.speed,
         timeSeconds: this.game.time,
         tier: this.game.state.tier,
@@ -241,6 +284,21 @@ export class VoidrushApp {
       },
       this.game.time,
     );
+  }
+
+  /** Short vibrations for the events a player feels rather than watches. */
+  private haptic(id: SoundId): void {
+    if (!this.settings.haptics) return;
+    if (typeof navigator === 'undefined' || typeof navigator.vibrate !== 'function') return;
+    let pattern: number | readonly number[];
+    if (id === 'COLLISION') pattern = HAPTIC_COLLISION;
+    else if (id === 'NEAR_MISS') pattern = HAPTIC_NEAR_MISS_MS;
+    else return;
+    try {
+      navigator.vibrate(pattern as number | number[]);
+    } catch {
+      // Vibration is decoration; a refusal changes nothing.
+    }
   }
 
   private onNearMiss(tier: NearMissTier, points: number): void {
@@ -312,6 +370,22 @@ export class VoidrushApp {
       this.audio.setDucked(false);
       this.audio.play('GAME_START');
     }, 0);
+  }
+
+  /** Escape pauses a run, resumes it, or closes Settings and Credits. */
+  handleEscape(): void {
+    const state = this.machine.state;
+    if (state === 'SETTINGS' || state === 'CREDITS') {
+      this.playSound('UI_CLICK');
+      this.back();
+    } else {
+      this.togglePause();
+    }
+  }
+
+  /** Analog steering from the on-screen joystick, each axis in [-1, 1], +Y up. */
+  setTouchAxis(x: number, y: number): void {
+    this.input?.setAxis(x, y);
   }
 
   togglePause(): void {
@@ -410,7 +484,8 @@ export class VoidrushApp {
       phase: this.game.phase,
       seed: this.runSeed,
       score: Math.round(this.game.score.score),
-      combo: this.game.score.combo,
+      combo: this.game.score.consecutiveClears,
+      multiplier: this.game.score.combo,
       obstacles: this.game.world.activeCount,
       solids: this.game.world.activePartCount,
       drawCalls: this.renderer?.drawCalls ?? 0,

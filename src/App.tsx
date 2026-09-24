@@ -16,11 +16,13 @@ import { HUD } from './ui/HUD';
 import { MainMenu } from './ui/MainMenu';
 import { PauseMenu } from './ui/PauseMenu';
 import { SettingsMenu } from './ui/SettingsMenu';
+import { TouchControls } from './ui/TouchControls';
+import { canHover, enterFullscreen, useTouchInput } from './ui/device';
 import type { GameState, PersistedStats, RunStats, Settings } from './types';
 import './ui/ui.css';
 
 const CANVAS_LABEL =
-  'VOIDRUSH gameplay area. Use W A S D to move through incoming obstacles. Press Escape to pause.';
+  'VOIDRUSH gameplay area. Use W A S D or the on-screen joystick to move through incoming obstacles. Press Escape to pause.';
 
 export function App(): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -66,7 +68,16 @@ export function App(): JSX.Element {
     app ? app.bridge.getSnapshot : EMPTY_SNAPSHOT,
   );
 
-  const hover = useCallback(() => appRef.current?.playSound('UI_HOVER'), []);
+  const touchDetected = useTouchInput();
+  const showTouchControls =
+    settings.touchControls === 'on' || (settings.touchControls === 'auto' && touchDetected);
+
+  // On a touchscreen, mouseenter fires as part of a tap and would double every
+  // click sound, so hover feedback is only for real hovering pointers.
+  const hover = useCallback(() => {
+    if (canHover()) appRef.current?.playSound('UI_HOVER');
+  }, []);
+  const steer = useCallback((x: number, y: number) => appRef.current?.setTouchAxis(x, y), []);
   const click = useCallback(<T,>(action: (instance: VoidrushApp) => T) => {
     return (): void => {
       const instance = appRef.current;
@@ -103,6 +114,15 @@ export function App(): JSX.Element {
     <>
       <canvas ref={canvasRef} aria-label={CANVAS_LABEL} tabIndex={-1} />
 
+      {state === 'PLAYING' && showTouchControls && (
+        <TouchControls
+          mode={settings.joystickMode}
+          side={settings.joystickSide}
+          size={settings.joystickSize}
+          onAxis={steer}
+        />
+      )}
+
       {state === 'PLAYING' && (
         <HUD snapshot={snapshot} onPause={click((instance) => instance.togglePause())} />
       )}
@@ -110,7 +130,13 @@ export function App(): JSX.Element {
       {state === 'MENU' && (
         <MainMenu
           stats={stats}
-          onPlay={click((instance) => instance.startRun())}
+          touch={showTouchControls}
+          onPlay={click((instance) => {
+            // Phones lose a fifth of the screen to browser chrome; take it back
+            // while the tap still counts as a user gesture.
+            if (touchDetected) enterFullscreen();
+            instance.startRun();
+          })}
           onSettings={click((instance) => instance.openSettings())}
           onCredits={click((instance) => instance.openCredits())}
           onHover={hover}
@@ -119,6 +145,8 @@ export function App(): JSX.Element {
 
       {state === 'PAUSED' && (
         <PauseMenu
+          score={snapshot.score}
+          timeSeconds={snapshot.timeSeconds}
           onResume={click((instance) => instance.resume())}
           onRestart={click((instance) => instance.startRun())}
           onMainMenu={click((instance) => instance.returnToMenu())}
@@ -140,6 +168,7 @@ export function App(): JSX.Element {
       {state === 'SETTINGS' && (
         <SettingsMenu
           settings={settings}
+          touch={touchDetected}
           onChange={(patch) => appRef.current?.updateSettings(patch)}
           onReset={click((instance) => instance.resetSettings())}
           onBack={click((instance) => instance.back())}

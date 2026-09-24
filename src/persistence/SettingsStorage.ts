@@ -9,12 +9,23 @@
 
 import { CAMERA, MOVEMENT } from '../config/GameConfig';
 import { clamp } from '../utils/MathUtils';
-import type { QualityLevel, Settings } from '../types';
+import type {
+  JoystickMode,
+  JoystickSide,
+  QualityLevel,
+  Settings,
+  TouchControlsMode,
+} from '../types';
 import { parseJson, readBoolean, readEnum, readNumber, readRaw, writeRaw } from './Storage';
 
 export const SETTINGS_KEY = 'voidrush-settings';
 
 export const QUALITY_LEVELS: readonly QualityLevel[] = ['low', 'medium', 'high', 'ultra'];
+export const TOUCH_CONTROL_MODES: readonly TouchControlsMode[] = ['auto', 'on', 'off'];
+export const JOYSTICK_MODES: readonly JoystickMode[] = ['floating', 'fixed'];
+export const JOYSTICK_SIDES: readonly JoystickSide[] = ['left', 'right'];
+export const JOYSTICK_SIZE_MIN = 0.75;
+export const JOYSTICK_SIZE_MAX = 1.35;
 
 /** [TRD] Medium is the default quality level. */
 export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
@@ -25,10 +36,15 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   movementSensitivity: MOVEMENT.SENSITIVITY_DEFAULT,
   cameraShake: CAMERA.SHAKE_DEFAULT,
   effectsIntensity: 1,
-  fov: CAMERA.FOV_BASE,
+  fov: CAMERA.FOV_DEFAULT,
   bloom: true,
   bloomIntensity: 1,
   visualIntensity: 1,
+  touchControls: 'auto' as TouchControlsMode,
+  joystickMode: 'floating' as JoystickMode,
+  joystickSide: 'left' as JoystickSide,
+  joystickSize: 1,
+  haptics: true,
 });
 
 /** Clamps every field into its legal range. */
@@ -61,6 +77,20 @@ export function normaliseSettings(input: Partial<Settings> | unknown): Settings 
       0,
       1,
     ),
+    touchControls: readEnum(
+      input,
+      'touchControls',
+      TOUCH_CONTROL_MODES,
+      DEFAULT_SETTINGS.touchControls,
+    ),
+    joystickMode: readEnum(input, 'joystickMode', JOYSTICK_MODES, DEFAULT_SETTINGS.joystickMode),
+    joystickSide: readEnum(input, 'joystickSide', JOYSTICK_SIDES, DEFAULT_SETTINGS.joystickSide),
+    joystickSize: clamp(
+      readNumber(input, 'joystickSize', DEFAULT_SETTINGS.joystickSize),
+      JOYSTICK_SIZE_MIN,
+      JOYSTICK_SIZE_MAX,
+    ),
+    haptics: readBoolean(input, 'haptics', DEFAULT_SETTINGS.haptics),
   };
 }
 

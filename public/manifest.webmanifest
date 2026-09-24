@@ -1,0 +1,19 @@
+{
+  "name": "VOIDRUSH — Endless Flight",
+  "short_name": "VOIDRUSH",
+  "description": "A first-person endless flight through a voxel tunnel. Dodge, thread the gap, go faster.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#080a0f",
+  "theme_color": "#080a0f",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

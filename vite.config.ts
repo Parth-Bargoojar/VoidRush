@@ -23,6 +23,17 @@ export default defineConfig({
     target: 'es2022',
     sourcemap: false,
     chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        // Libraries change far less often than game code. Separate chunks keep
+        // their content hash stable, so a returning player re-downloads only
+        // the small app chunk after a deploy (assets are cached as immutable).
+        manualChunks: {
+          three: ['three'],
+          react: ['react', 'react-dom'],
+        },
+      },
+    },
   },
   test: {
     // Node by default; DOM-facing suites opt in with an @vitest-environment

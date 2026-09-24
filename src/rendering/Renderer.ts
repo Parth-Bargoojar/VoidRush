@@ -198,7 +198,7 @@ export class Renderer {
     const w = Math.max(1, width);
     const h = Math.max(1, height);
     this.camera.aspect = w / h;
-    this.camera.updateProjectionMatrix();
+    this.cameraController.setAspect(w / h);
     this.renderer.setSize(w, h, false);
     this.applyPixelRatio();
     this.post.setSize(w, h, this.renderer.getPixelRatio());

@@ -144,6 +144,13 @@ export interface InputState {
   down: boolean;
   left: boolean;
   right: boolean;
+  /**
+   * Optional analog steering from the touch joystick, each in [-1, 1] with +Y
+   * up. Combined with the digital keys and clamped to unit length, so a
+   * half-deflected stick flies at half speed and nothing exceeds full speed.
+   */
+  axisX?: number;
+  axisY?: number;
 }
 
 /* ------------------------------------------------------------------ *
@@ -190,8 +197,11 @@ export type NearMissTier = 'NONE' | 'CLOSE' | 'NEAR' | 'EXTREME';
 
 export interface ScoreState {
   score: number;
+  /** The tiered score multiplier (x1..x6) earned by the current streak. */
   combo: number;
+  /** The combo the player sees: +1 for every obstacle cleared, reset only by a crash. */
   consecutiveClears: number;
+  /** The longest streak of the run. */
   maxCombo: number;
   obstaclesCleared: number;
   nearMisses: number;
@@ -243,7 +253,21 @@ export interface Settings {
    * the whole run; 1 lets effects build to full strength.
    */
   visualIntensity: number;
+  /** Whether the on-screen joystick is shown. AUTO follows the device. */
+  touchControls: TouchControlsMode;
+  /** FLOATING spawns the stick under the thumb; FIXED keeps it in a corner. */
+  joystickMode: JoystickMode;
+  /** Which corner the stick rests in. */
+  joystickSide: JoystickSide;
+  /** Scales the stick's radius, 0.75 to 1.35. */
+  joystickSize: number;
+  /** Short vibrations on near misses and impacts, where the device supports it. */
+  haptics: boolean;
 }
+
+export type TouchControlsMode = 'auto' | 'on' | 'off';
+export type JoystickMode = 'floating' | 'fixed';
+export type JoystickSide = 'left' | 'right';
 
 /** Persisted under `voidrush-stats`. Schema fixed by the TRD. */
 export interface PersistedStats {

@@ -13,6 +13,23 @@ import { clamp, damp } from '../utils/MathUtils';
 import { mulberry32 } from '../utils/Random';
 import type { Player } from '../types';
 
+/**
+ * Portrait screens. The FOV setting is vertical, so on a tall phone the same
+ * number shows a narrow slit of the tunnel's width. Below a square aspect the
+ * vertical FOV is widened by aspect^-PORTRAIT_FOV_EXPONENT — enough to keep
+ * the gaps on either side in view without the fisheye a full correction gives.
+ */
+const PORTRAIT_FOV_EXPONENT = 0.5;
+const PORTRAIT_FOV_CAP = 110;
+const DEG_TO_RAD = Math.PI / 180;
+
+/** The vertical FOV that gives a portrait viewport a usable horizontal view. */
+export function aspectCorrectedFov(fov: number, aspect: number): number {
+  if (!(aspect > 0) || aspect >= 1) return fov;
+  const half = Math.tan((fov * DEG_TO_RAD) / 2) / Math.pow(aspect, PORTRAIT_FOV_EXPONENT);
+  return Math.min(PORTRAIT_FOV_CAP, (2 * Math.atan(half)) / DEG_TO_RAD);
+}
+
 export class CameraController {
   private readonly camera: PerspectiveCamera;
   private readonly noise = mulberry32(0x5eed);
@@ -24,6 +41,7 @@ export class CameraController {
   private shake = 0;
   private shakeScale = CAMERA.SHAKE_DEFAULT;
   private baseFov = CAMERA.FOV_BASE;
+  private aspect = 16 / 9;
 
   constructor(camera: PerspectiveCamera) {
     this.camera = camera;
@@ -37,6 +55,13 @@ export class CameraController {
 
   setBaseFov(value: number): void {
     this.baseFov = clamp(value, CAMERA.FOV_MIN, CAMERA.FOV_MAX);
+  }
+
+  /** Called on resize so portrait screens can widen the projection. */
+  setAspect(aspect: number): void {
+    this.aspect = aspect;
+    this.camera.fov = aspectCorrectedFov(this.fov, this.aspect);
+    this.camera.updateProjectionMatrix();
   }
 
   /** Adds an impulse. Shake is only ever triggered by events, never sustained. */
@@ -84,8 +109,9 @@ export class CameraController {
     );
     this.camera.rotation.set(0, 0, this.roll + (this.noise() - 0.5) * jitter * 0.02);
 
-    if (Math.abs(this.camera.fov - this.fov) > 1e-4) {
-      this.camera.fov = this.fov;
+    const projected = aspectCorrectedFov(this.fov, this.aspect);
+    if (Math.abs(this.camera.fov - projected) > 1e-4) {
+      this.camera.fov = projected;
       this.camera.updateProjectionMatrix();
     }
   }

@@ -5,13 +5,18 @@
  * naturally. Movement keys have their default action suppressed only while
  * PLAYING, so arrow keys still scroll menus and never scroll the page mid-run.
  *
+ * The touch joystick writes an analog axis through `setAxis`; the keyboard and
+ * the stick can be used together and the player step clamps their sum.
+ *
  * Every listener registered here is removed by `dispose`, and a test asserts
  * the global listener count returns to its baseline.
  */
 
 import type { InputState } from '../types';
 
-const MOVE_KEYS: Readonly<Record<string, keyof InputState>> = Object.freeze({
+type Direction = 'up' | 'down' | 'left' | 'right';
+
+const MOVE_KEYS: Readonly<Record<string, Direction>> = Object.freeze({
   KeyW: 'up',
   KeyS: 'down',
   KeyA: 'left',
@@ -23,6 +28,7 @@ const MOVE_KEYS: Readonly<Record<string, keyof InputState>> = Object.freeze({
 });
 
 export interface InputCallbacks {
+  /** Escape: pauses or resumes a run, or closes an overlay screen. */
   onPauseToggle: () => void;
   onBlur: () => void;
   /** True while the simulation is running, which gates preventDefault. */
@@ -31,7 +37,14 @@ export interface InputCallbacks {
 
 export class InputManager {
   private readonly held = new Set<string>();
-  private readonly state: InputState = { up: false, down: false, left: false, right: false };
+  private readonly state: InputState = {
+    up: false,
+    down: false,
+    left: false,
+    right: false,
+    axisX: 0,
+    axisY: 0,
+  };
   private readonly callbacks: InputCallbacks;
   private readonly target: Window;
   private attached = false;
@@ -71,6 +84,14 @@ export class InputManager {
     this.state.down = false;
     this.state.left = false;
     this.state.right = false;
+    this.state.axisX = 0;
+    this.state.axisY = 0;
+  }
+
+  /** Analog steering from the touch joystick, each component in [-1, 1]. */
+  setAxis(x: number, y: number): void {
+    this.state.axisX = Number.isFinite(x) ? Math.max(-1, Math.min(1, x)) : 0;
+    this.state.axisY = Number.isFinite(y) ? Math.max(-1, Math.min(1, y)) : 0;
   }
 
   private refresh(): void {

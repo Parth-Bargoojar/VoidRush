@@ -111,6 +111,8 @@ export const CAMERA = frozen({
   FOV_SPEED_GAIN: 15,
   FOV_MIN: 65,
   FOV_MAX: 95,
+  /** The field-of-view setting a new player starts on: the widest view. */
+  FOV_DEFAULT: 95,
   FOV_SMOOTH_TAU: 0.4,
   /** [PRD] Maximum roll approximately +/-5 degrees. */
   MAX_ROLL: (5 * Math.PI) / 180,
@@ -120,7 +122,8 @@ export const CAMERA = frozen({
   NEAR_CLIP: 0.1,
   /** [PRD] Far clip 500+. */
   FAR_CLIP: 600,
-  SHAKE_DEFAULT: 0.35,
+  /** The camera-shake setting a new player starts on: full strength. */
+  SHAKE_DEFAULT: 1,
   SHAKE_COLLISION: 1,
   SHAKE_COMBO: 0.35,
   SHAKE_DECAY_TAU: 0.18,

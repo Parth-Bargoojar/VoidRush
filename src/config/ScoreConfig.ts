@@ -46,6 +46,8 @@ export const COMBO = frozen({
    * so this single constant raises it.
    */
   MAX_MULTIPLIER: 6,
+  /** A silent "COMBO ×N" notification every this many consecutive clears. */
+  NOTIFY_EVERY: 5,
   THRESHOLDS: Object.freeze([
     Object.freeze({ clears: 0, multiplier: 1 }),
     Object.freeze({ clears: 3, multiplier: 2 }),

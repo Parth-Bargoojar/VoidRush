@@ -51,6 +51,20 @@ export function stepPlayer(
     dirY *= inv;
   }
 
+  // Analog stick input adds to the keys; the sum is clamped to unit length so
+  // mixing the two can never beat the top speed.
+  const axisX = input.axisX ?? 0;
+  const axisY = input.axisY ?? 0;
+  if (axisX !== 0 || axisY !== 0) {
+    dirX += clamp(axisX, -1, 1);
+    dirY += clamp(axisY, -1, 1);
+    const length = Math.hypot(dirX, dirY);
+    if (length > 1) {
+      dirX /= length;
+      dirY /= length;
+    }
+  }
+
   const maxSpeed = effectiveLateralSpeed(sensitivity);
   player.vx = damp(player.vx, dirX * maxSpeed, MOVEMENT.TAU, dt);
   player.vy = damp(player.vy, dirY * maxSpeed, MOVEMENT.TAU, dt);
@@ -82,4 +96,6 @@ export const EMPTY_INPUT: InputState = Object.freeze({
   down: false,
   left: false,
   right: false,
+  axisX: 0,
+  axisY: 0,
 });

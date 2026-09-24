@@ -212,7 +212,6 @@ export class Game {
     const milestone = updateSurvivalMultiplier(this.score, this.time);
     if (milestone) {
       this.hooks.onSurvivalMilestone?.(milestone.multiplier, milestone.label);
-      this.hooks.onSound?.('COMBO_UP');
     }
 
     stepPlayer(this.player, input, dt, this.sensitivity);
@@ -234,7 +233,6 @@ export class Game {
       // A cleared obstacle scores exactly once: CONSUMED is set here, and the
       // CLEAR event only ever fires on the APPROACHING -> CLEARED transition.
       const award = registerClear(this.score, event.type);
-      this.hooks.onSound?.('OBSTACLE_PASS');
 
       const tier = nearMissTier(event.minSurfaceDistance);
       if (tier !== 'NONE') {
@@ -243,9 +241,9 @@ export class Game {
         this.hooks.onSound?.('NEAR_MISS');
       }
 
+      // Combos are silent: the HUD counter and a notification every few clears.
       if (award.milestone) {
         this.hooks.onComboMilestone?.(award.combo);
-        this.hooks.onSound?.('COMBO_UP');
       }
       // Shake is reserved for collisions and combo milestones; never continuous.
       if (this.score.consecutiveClears % CAMERA.COMBO_SHAKE_INTERVAL === 0) {
@@ -310,6 +308,7 @@ export class Game {
       vy: this.player.vy.toFixed(9),
       score: this.score.score.toFixed(6),
       combo: this.score.combo,
+      streak: this.score.consecutiveClears,
       cleared: this.score.obstaclesCleared,
       near: this.score.nearMisses,
       active: this.world.activeCount,

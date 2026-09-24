@@ -19,6 +19,7 @@
 ## ✨ Features
 
 - 🎮 **Intuitive Arcade Controls:** WASD / Arrow key steering with smooth inertial response, positional camera lag, and dynamic turn roll.
+- 📱 **Plays on Phones & Tablets:** An analog on-screen joystick (floating or fixed, left or right hand, adjustable size), vibration feedback, safe-area-aware HUD, bottom-sheet menus, portrait and landscape support, and a fullscreen / installable web-app mode.
 - 🌀 **Procedural Tunnel Pipeline:** Dynamic cross-section variations (rectangular, polygonal, twisting up to 14°) with seamless segment recycling.
 - 🚧 **8 Distinct Obstacle Archetypes:**
   - **Static Gate** & **Ring / Bullseye**
@@ -54,7 +55,16 @@
 | `S` / `Down Arrow` | Steer Down |
 | `A` / `Left Arrow` | Steer Left |
 | `D` / `Right Arrow` | Steer Right |
-| `ESC` | Pause / Resume Game |
+| `ESC` | Pause / Resume Game · Close Settings & Credits |
+
+### Touch (phones & tablets)
+
+| Gesture | Action |
+| --- | --- |
+| Touch & drag anywhere | Steer — the joystick appears under your thumb and follows it. Push further to fly faster. |
+| Tap the ❚❚ button (top right) | Pause |
+
+The joystick is analog: a half-pushed stick steers at half speed, which makes threading narrow gaps easier on glass. Under **Settings → Controls** you can switch between a *floating* and a *fixed* stick, move it to the right hand, resize it, turn vibration on or off, or force the joystick on or off (it shows automatically once you touch the screen). For the best view, play in landscape, or add the game to your home screen so it runs fullscreen.
 
 ---
 
