@@ -19,13 +19,24 @@ import { Game } from '../game/Game';
 import { GameLoop } from '../game/GameLoop';
 import { GameStateMachine, type GameAction } from '../game/GameStateMachine';
 import { InputManager } from '../game/InputManager';
+import { detectTouchPrimary, resolveControlMode, tiltUsable } from '../input/ControlMode';
+import { GyroscopeInput } from '../input/GyroscopeInput';
+import type { CalibrationResult } from '../input/tilt';
 import { buildRunStats, mergeStats } from '../game/RunStats';
 import { Renderer, RendererError } from '../rendering/Renderer';
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from '../persistence/SettingsStorage';
 import { loadStats, saveStats } from '../persistence/ScoreStorage';
 import { seedFromString } from '../utils/Random';
 import { now } from '../utils/Timing';
-import type { GameState, NearMissTier, PersistedStats, RunStats, Settings } from '../types';
+import type {
+  ActiveControl,
+  ControlInfo,
+  GameState,
+  NearMissTier,
+  PersistedStats,
+  RunStats,
+  Settings,
+} from '../types';
 import { GameBridge } from './GameBridge';
 
 /** Vibration lengths in ms. Kept short: feedback, not a buzz. */
@@ -38,6 +49,8 @@ export interface AppListener {
   onStatsChange: (stats: PersistedStats) => void;
   onRunEnd: (stats: RunStats) => void;
   onFatal: (message: string) => void;
+  /** Control mode, tilt status or calibration changed. Low frequency. */
+  onControlChange: (info: ControlInfo) => void;
 }
 
 /** Reads `?seed=` so a run can be reproduced exactly. */
@@ -53,6 +66,8 @@ export class VoidrushApp {
   readonly bridge = new GameBridge();
   readonly game: Game;
   readonly audio = new AudioEngine();
+  /** Tilt steering. Created on load but never asks for permission on its own. */
+  readonly tilt = new GyroscopeInput();
 
   private renderer: Renderer | null = null;
   private readonly machine: GameStateMachine;
@@ -68,6 +83,8 @@ export class VoidrushApp {
   private orientationHandler: (() => void) | null = null;
   private orientationTimer: ReturnType<typeof setTimeout> | null = null;
   private firstTouchHandler: (() => void) | null = null;
+  private readonly touchPrimary = detectTouchPrimary();
+  private control: ControlInfo;
   private seedOverride: number | null;
   private runSeed = 1;
   private disposed = false;
@@ -108,6 +125,14 @@ export class VoidrushApp {
       // but advance the slow background drift [PRD 30, Screen 1].
       shouldStep: () => this.machine.state === 'PLAYING' || this.game.phase === 'IDLE',
     });
+
+    this.control = {
+      active: 'keyboard',
+      status: this.tilt.status,
+      calibrated: false,
+      touchPrimary: this.touchPrimary,
+    };
+    this.applyTiltTuning();
   }
 
   /* -------------------------------------------------------------- *
@@ -141,6 +166,9 @@ export class VoidrushApp {
 
     this.windowResizeHandler = (): void => this.applyViewportSize();
     window.addEventListener('resize', this.windowResizeHandler);
+    // Mobile toolbars sliding in and out change the visible height; not every
+    // browser reports that as a window resize.
+    window.visualViewport?.addEventListener('resize', this.windowResizeHandler);
     // iOS reports the old size for a moment after rotating, so measure again
     // once the rotation has settled.
     this.orientationHandler = (): void => {
@@ -170,10 +198,33 @@ export class VoidrushApp {
       isPlaying: () => this.machine.state === 'PLAYING',
     });
     this.input.attach();
+    this.input.setTiltSource(this.tilt);
+
+    this.tilt.setCallbacks({
+      onStatusChange: (status) => {
+        // A dead sensor mid-run would leave the ship unsteerable: stop the run
+        // rather than let the player crash through no fault of their own.
+        if (status === 'lost' && this.machine.state === 'PLAYING' && this.input?.isTiltEnabled) {
+          this.pause();
+        }
+        this.syncControl();
+      },
+      onCalibrationChange: () => this.syncControl(),
+      // The mapping has already switched to the new orientation and the neutral
+      // pose is gone. Pause; resuming runs calibration first (see App).
+      onOrientationChange: () => {
+        if (this.control.active === 'tilt') this.pause();
+      },
+    });
+    // Android and other permission-free platforms start listening now, which
+    // also finds out early whether a sensor is really there. iOS waits for a
+    // tap: `start` refuses while permission is outstanding.
+    this.syncControl();
 
     this.attachDiagnosticsHook();
     listener.onSettingsChange(this.settings);
     listener.onStatsChange(this.stats);
+    listener.onControlChange(this.control);
     this.loop.start();
     return true;
   }
@@ -194,10 +245,12 @@ export class VoidrushApp {
     if (this.disposed) return;
     this.disposed = true;
     this.loop.stop();
+    this.tilt.dispose();
     this.input?.dispose();
     this.input = null;
     if (this.windowResizeHandler) {
       window.removeEventListener('resize', this.windowResizeHandler);
+      window.visualViewport?.removeEventListener('resize', this.windowResizeHandler);
       this.windowResizeHandler = null;
     }
     if (this.orientationHandler) {
@@ -238,6 +291,8 @@ export class VoidrushApp {
 
   private safeStep(dt: number): void {
     try {
+      // Sensor events only recorded state; smoothing advances here, with the step.
+      this.input?.update(dt);
       this.game.step(dt, this.input?.input);
     } catch (error) {
       this.handleFatalDuringPlay(error);
@@ -316,6 +371,10 @@ export class VoidrushApp {
 
   get currentSettings(): Settings {
     return this.settings;
+  }
+
+  get controlInfo(): ControlInfo {
+    return this.control;
   }
 
   get currentStats(): PersistedStats {
@@ -450,6 +509,7 @@ export class VoidrushApp {
 
     this.renderer?.applySettings(this.settings);
     this.game.setSensitivity(this.settings.movementSensitivity);
+    this.applyTiltTuning();
     this.audio.setVolumes({
       master: this.settings.masterVolume,
       music: this.settings.musicVolume,
@@ -460,6 +520,119 @@ export class VoidrushApp {
 
   resetSettings(): void {
     this.updateSettings(DEFAULT_SETTINGS);
+  }
+
+  /* -------------------------------------------------------------- *
+   * Tilt
+   * -------------------------------------------------------------- */
+
+  private applyTiltTuning(): void {
+    this.tilt.setTuning({
+      sensitivity: this.settings.tiltSensitivity,
+      deadZone: this.settings.tiltDeadZone,
+      invertX: this.settings.tiltInvertX,
+      invertY: this.settings.tiltInvertY,
+    });
+    this.syncControl();
+  }
+
+  private resolveActive(): ActiveControl {
+    return resolveControlMode(this.settings.controlMode, {
+      touchPrimary: this.touchPrimary,
+      tilt: this.tilt.status,
+    });
+  }
+
+  /**
+   * Resolves which source steers, starts or stops the sensor to match, gates
+   * tilt into the input, and tells React if anything visible changed. Runs on
+   * events only (settings, status, calibration), never per frame.
+   */
+  private syncControl(): void {
+    // Before mount there is nothing to drive and nobody to tell.
+    if (!this.input) return;
+    const active = this.resolveActive();
+    if (active === 'tilt') this.tilt.start();
+    else if (this.tilt.isListening) this.tilt.stop();
+
+    // Starting or stopping can change the status, and with it the answer.
+    const resolved = this.resolveActive();
+    this.input.setTiltEnabled(resolved === 'tilt' && this.tilt.calibrated);
+
+    const next: ControlInfo = {
+      active: resolved,
+      status: this.tilt.status,
+      calibrated: this.tilt.calibrated,
+      touchPrimary: this.touchPrimary,
+    };
+    const previous = this.control;
+    if (
+      previous.active === next.active &&
+      previous.status === next.status &&
+      previous.calibrated === next.calibrated
+    ) {
+      return;
+    }
+    this.control = next;
+    this.listener?.onControlChange(next);
+  }
+
+  /**
+   * Readies tilt for a run. MUST be called synchronously inside the tap that
+   * starts or resumes play, because iOS only shows its motion-access prompt
+   * from a user gesture. Returns null when tilt is not wanted at all, so the
+   * caller can carry on synchronously; otherwise resolves whether tilt will
+   * steer (false after a refusal, and the game falls back to touch or keys).
+   */
+  prepareTilt(): Promise<boolean> | null {
+    const wanted =
+      this.settings.controlMode === 'tilt' ||
+      (this.settings.controlMode === 'auto' && this.touchPrimary);
+    if (!wanted || !tiltUsable(this.tilt.status)) return null;
+    const access = this.tilt.needsPermission ? this.tilt.requestPermission() : Promise.resolve(true);
+    return access.then((granted) => {
+      this.syncControl();
+      return granted && this.control.active === 'tilt';
+    });
+  }
+
+  /**
+   * ENABLE TILT in Settings: asks again after a refusal and retries a sensor
+   * that previously gave nothing. Must be called from a user gesture.
+   */
+  enableTilt(): Promise<boolean> {
+    this.tilt.reset();
+    return this.tilt.requestPermission().then((granted) => {
+      this.syncControl();
+      return granted;
+    });
+  }
+
+  /** The player gave up on tilt for this session; touch or keys take over. */
+  disableTiltForSession(): void {
+    this.tilt.markUnavailable();
+    this.syncControl();
+  }
+
+  /** True when tilt will steer but has no neutral pose yet. */
+  get needsCalibration(): boolean {
+    return this.control.active === 'tilt' && !this.tilt.calibrated;
+  }
+
+  beginCalibration(): void {
+    this.syncControl();
+    this.tilt.beginCalibration();
+  }
+
+  finishCalibration(acceptUnsteady: boolean): CalibrationResult {
+    const result = this.tilt.finishCalibration(acceptUnsteady);
+    this.input?.clear();
+    this.syncControl();
+    return result;
+  }
+
+  cancelCalibration(): void {
+    this.tilt.cancelCalibration();
   }
 
   /** Called by the engine once the impact sequence has finished. */
@@ -509,6 +682,11 @@ export class VoidrushApp {
       tunnelMenu: this.game.world.tunnel.profile.isMenu ? 1 : 0,
       fov: Math.round(this.renderer?.cameraController.currentFov ?? CAMERA.FOV_BASE),
       sensitivity: this.settings.movementSensitivity * MOVEMENT.MAX_LATERAL_SPEED,
+      playerX: Math.round(this.game.player.x * 1000) / 1000,
+      playerY: Math.round(this.game.player.y * 1000) / 1000,
+      control: this.control.active,
+      tiltStatus: this.control.status,
+      tiltCalibrated: this.control.calibrated ? 1 : 0,
     };
   }
 }

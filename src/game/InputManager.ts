@@ -1,18 +1,37 @@
 /**
- * VOIDRUSH — keyboard input.
+ * VOIDRUSH — the input manager: every steering source, one InputState.
+ *
+ *   InputManager
+ *   ├── keyboard (held keys, here)
+ *   ├── touch joystick (analog, pushed in through `setAxis`)
+ *   └── tilt (analog, an AnalogSource polled in `update`)
+ *            ↓
+ *   InputState → readSteering → { horizontal, vertical } → stepPlayer
  *
  * Held keys live in a Set, so simultaneous presses produce diagonal motion
  * naturally. Movement keys have their default action suppressed only while
  * PLAYING, so arrow keys still scroll menus and never scroll the page mid-run.
  *
- * The touch joystick writes an analog axis through `setAxis`; the keyboard and
- * the stick can be used together and the player step clamps their sum.
+ * Analog sources are summed into `axisX`/`axisY`; the player step clamps the
+ * total to unit length, so no combination can exceed full speed.
  *
  * Every listener registered here is removed by `dispose`, and a test asserts
  * the global listener count returns to its baseline.
  */
 
 import type { InputState } from '../types';
+import { clamp } from '../utils/MathUtils';
+
+/**
+ * An analog source sampled by the game loop, such as tilt. Its own events only
+ * update its internal state; `update` advances it by the fixed step.
+ */
+export interface AnalogSource {
+  readonly x: number;
+  readonly y: number;
+  update(dt: number): void;
+  resetOutput(): void;
+}
 
 type Direction = 'up' | 'down' | 'left' | 'right';
 
@@ -49,6 +68,11 @@ export class InputManager {
   private readonly target: Window;
   private attached = false;
 
+  private touchX = 0;
+  private touchY = 0;
+  private tilt: AnalogSource | null = null;
+  private tiltEnabled = false;
+
   constructor(callbacks: InputCallbacks, target: Window = window) {
     this.callbacks = callbacks;
     this.target = target;
@@ -84,14 +108,56 @@ export class InputManager {
     this.state.down = false;
     this.state.left = false;
     this.state.right = false;
+    this.touchX = 0;
+    this.touchY = 0;
+    this.tilt?.resetOutput();
     this.state.axisX = 0;
     this.state.axisY = 0;
   }
 
   /** Analog steering from the touch joystick, each component in [-1, 1]. */
   setAxis(x: number, y: number): void {
-    this.state.axisX = Number.isFinite(x) ? Math.max(-1, Math.min(1, x)) : 0;
-    this.state.axisY = Number.isFinite(y) ? Math.max(-1, Math.min(1, y)) : 0;
+    this.touchX = Number.isFinite(x) ? clamp(x, -1, 1) : 0;
+    this.touchY = Number.isFinite(y) ? clamp(y, -1, 1) : 0;
+    this.compose();
+  }
+
+  /** Registers the tilt source. It is polled by `update` whether or not it steers. */
+  setTiltSource(source: AnalogSource | null): void {
+    this.tilt = source;
+    this.compose();
+  }
+
+  /** Whether tilt output reaches the player. */
+  setTiltEnabled(enabled: boolean): void {
+    if (this.tiltEnabled === enabled) return;
+    this.tiltEnabled = enabled;
+    this.tilt?.resetOutput();
+    this.compose();
+  }
+
+  get isTiltEnabled(): boolean {
+    return this.tiltEnabled;
+  }
+
+  /**
+   * Called by the game loop once per fixed step, before the simulation reads
+   * `input`. Advances the tilt source's smoothing and folds it in.
+   */
+  update(dt: number): void {
+    this.tilt?.update(dt);
+    if (this.tiltEnabled) this.compose();
+  }
+
+  private compose(): void {
+    let x = this.touchX;
+    let y = this.touchY;
+    if (this.tiltEnabled && this.tilt) {
+      x += this.tilt.x;
+      y += this.tilt.y;
+    }
+    this.state.axisX = clamp(x, -1, 1);
+    this.state.axisY = clamp(y, -1, 1);
   }
 
   private refresh(): void {

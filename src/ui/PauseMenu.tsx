@@ -1,9 +1,12 @@
 /**
  * Pause overlay. The simulation is fully stopped behind it: the loop does not
  * step, obstacles do not move, the timer does not run and the music is ducked.
+ *
+ * This is also the only way out of a run on a phone, where there is no Esc
+ * key, and where tilt is recalibrated mid-session.
  */
 
-import { Home, Maximize, Minimize, Play, RotateCcw, Settings } from 'lucide-react';
+import { Crosshair, Hand, Home, Maximize, Minimize, Play, RotateCcw, Settings } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { formatNumber, formatTime } from '../utils/MathUtils';
 import { fullscreenSupported, toggleFullscreen, useFullscreen } from './device';
@@ -17,6 +20,13 @@ interface PauseMenuProps {
   onMainMenu: () => void;
   onSettings: () => void;
   onHover: () => void;
+  /** Tilt is steering, so recalibration is offered. */
+  tilt?: boolean;
+  /** Why the run is on hold, when it was not the player's choice. */
+  note?: string | null;
+  onRecalibrate?: () => void;
+  /** Offered with a note about a failing sensor: steer by touch instead. */
+  onUseTouch?: () => void;
 }
 
 export function PauseMenu({
@@ -27,6 +37,10 @@ export function PauseMenu({
   onMainMenu,
   onSettings,
   onHover,
+  tilt = false,
+  note = null,
+  onRecalibrate,
+  onUseTouch,
 }: PauseMenuProps): JSX.Element {
   const resumeRef = useRef<HTMLButtonElement>(null);
   const fullscreen = useFullscreen();
@@ -56,6 +70,12 @@ export function PauseMenu({
         </div>
       </div>
 
+      {note && (
+        <p className="pause-note" role="status">
+          {note}
+        </p>
+      )}
+
       <div className="pause-actions">
         <button
           ref={resumeRef}
@@ -76,6 +96,28 @@ export function PauseMenu({
           <RotateCcw size={20} strokeWidth={2} aria-hidden="true" />
           Restart
         </button>
+        {tilt && onRecalibrate && (
+          <button
+            type="button"
+            className="button button--secondary button--block"
+            onClick={onRecalibrate}
+            onMouseEnter={onHover}
+          >
+            <Crosshair size={20} strokeWidth={2} aria-hidden="true" />
+            Recalibrate tilt
+          </button>
+        )}
+        {note && onUseTouch && (
+          <button
+            type="button"
+            className="button button--secondary button--block"
+            onClick={onUseTouch}
+            onMouseEnter={onHover}
+          >
+            <Hand size={20} strokeWidth={2} aria-hidden="true" />
+            Use touch controls
+          </button>
+        )}
         <button
           type="button"
           className="button button--secondary button--block"

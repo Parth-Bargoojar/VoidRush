@@ -360,6 +360,49 @@ kbd {
   text-transform: uppercase;
 }
 
+.menu__note {
+  display: block;
+  margin-top: var(--space-2);
+  letter-spacing: 0.06em;
+  text-transform: none;
+  color: var(--color-warning);
+}
+
+/* ------------------------------------------------------------------ *
+ * Tilt settings
+ * ------------------------------------------------------------------ */
+
+.tilt-status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.tilt-status svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.tilt-status[data-status='active'] {
+  color: var(--color-success);
+}
+
+.tilt-status[data-status='denied'],
+.tilt-status[data-status='lost'],
+.tilt-status[data-status='unavailable'] {
+  color: var(--color-warning);
+}
+
+.tilt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
 @keyframes rise-in {
   from {
     opacity: 0;
@@ -550,6 +593,18 @@ kbd {
 .pause-actions__resume {
   height: 56px;
   font-size: 17px;
+}
+
+/* Why the run is on hold, when the player did not choose it. */
+.pause-note {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 212, 71, 0.06);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--color-text-primary);
 }
 
 /* ------------------------------------------------------------------ *
@@ -1381,30 +1436,43 @@ code {
 }
 
 /* ------------------------------------------------------------------ *
- * Rotate gate: phones and tablets held upright
+ * Rotate hint: phones and tablets held upright
+ *
+ * A small card, not a wall: portrait still plays.
  * ------------------------------------------------------------------ */
 
-.rotate-gate {
+.rotate-hint {
   position: fixed;
-  inset: 0;
+  left: 50%;
+  bottom: calc(max(var(--space-4), var(--safe-bottom)) + var(--space-2));
   z-index: var(--z-gate);
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: var(--space-4);
-  padding: max(var(--space-8), var(--safe-top)) max(var(--space-6), var(--safe-right))
-    max(var(--space-8), var(--safe-bottom)) max(var(--space-6), var(--safe-left));
-  background: var(--color-bg);
-  text-align: center;
-  touch-action: none;
-  -webkit-user-select: none;
-  user-select: none;
+  gap: var(--space-3);
+  width: min(420px, calc(100% - 2 * max(var(--space-4), var(--safe-left), var(--safe-right))));
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  background: rgba(16, 20, 27, 0.94);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  transform: translateX(-50%);
+  animation: rotate-hint-in var(--duration-medium) var(--ease-default);
 }
 
-.rotate-gate__device {
+@keyframes rotate-hint-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
+}
+
+.rotate-hint__device {
   display: flex;
-  margin-bottom: var(--space-2);
+  flex-shrink: 0;
   color: var(--color-white);
   animation: rotate-hint 2.4s var(--ease-default) infinite;
 }
@@ -1424,31 +1492,181 @@ code {
   }
 }
 
-.rotate-gate__title {
-  margin: 0;
-  font-size: clamp(22px, 7vw, 30px);
+.rotate-hint__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rotate-hint__title {
+  font-size: 14px;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--color-text-primary);
 }
 
-.rotate-gate__body {
-  max-width: 320px;
-  margin: 0 0 var(--space-2);
-  font-size: 15px;
+.rotate-hint__body {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.rotate-hint__action {
+  height: 44px;
+  padding: 0 var(--space-3);
+  font-size: 12px;
+}
+
+.rotate-hint__close {
+  flex-shrink: 0;
+  background: transparent;
+  border-color: transparent;
+}
+
+/* Narrow screens: the Landscape button drops to its own row so the text
+   never has to wrap. */
+@media (max-width: 440px) {
+  .rotate-hint {
+    flex-wrap: wrap;
+    padding-bottom: var(--space-3);
+  }
+  .rotate-hint__action {
+    order: 3;
+    flex: 1 0 100%;
+    margin-right: var(--space-2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rotate-hint__device {
+    animation: none;
+    transform: rotate(-90deg);
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Tilt calibration
+ * ------------------------------------------------------------------ */
+
+.calibrate {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-gate);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(var(--space-6), var(--safe-top)) max(var(--space-6), var(--safe-right))
+    max(var(--space-6), var(--safe-bottom)) max(var(--space-6), var(--safe-left));
+  background: radial-gradient(
+    ellipse at center,
+    rgba(8, 10, 15, 0.55) 0%,
+    rgba(8, 10, 15, 0.9) 70%,
+    rgba(8, 10, 15, 0.97) 100%
+  );
+  text-align: center;
+  touch-action: none;
+  animation: results-in var(--duration-standard) var(--ease-default);
+}
+
+.calibrate__close {
+  position: absolute;
+  top: max(var(--space-4), var(--safe-top));
+  right: max(var(--space-4), var(--safe-right));
+}
+
+.calibrate__panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  max-width: 420px;
+}
+
+.calibrate__eyebrow {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--color-info);
+}
+
+.calibrate__device {
+  display: flex;
+  color: var(--color-white);
+  /* Drawn the way the player holds it: sideways. */
+  transform: rotate(-90deg);
+}
+
+.calibrate__body {
+  margin: 0;
+  font-size: 16px;
   line-height: 1.5;
   color: var(--color-text-secondary);
 }
 
-.rotate-gate__caption {
-  max-width: 280px;
+/* Fixed height, so the switch from text to numerals never shifts the layout. */
+.calibrate__stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 96px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .rotate-gate__device {
-    animation: none;
-    transform: rotate(-90deg);
+.calibrate__status {
+  margin: 0;
+  font-size: clamp(24px, 6vw, 34px);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-primary);
+}
+
+.calibrate__status--warn {
+  color: var(--color-warning);
+  text-shadow: 0 0 20px rgba(255, 212, 71, 0.35);
+}
+
+.calibrate__status--ready {
+  color: var(--color-success);
+  text-shadow: 0 0 24px rgba(57, 229, 140, 0.45);
+}
+
+.calibrate__status--error {
+  color: var(--color-error);
+}
+
+.calibrate__count {
+  font-size: 88px;
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-white);
+  text-shadow: 0 0 32px rgba(255, 255, 255, 0.35);
+  animation: combo-bump var(--duration-fast) var(--ease-default);
+}
+
+.calibrate__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+@media (max-height: 520px) {
+  .calibrate__panel {
+    gap: var(--space-2);
+  }
+  .calibrate__stage {
+    height: 72px;
+  }
+  .calibrate__count {
+    font-size: 64px;
   }
 }
 
@@ -1698,6 +1916,17 @@ code {
     padding: 0 var(--space-2);
     font-size: 13px;
     letter-spacing: 0.04em;
+    /* Tilt adds longer labels (Recalibrate tilt, Use touch controls); let them
+       take two lines rather than spill into the next button. */
+    white-space: normal;
+    line-height: 1.15;
+    text-align: center;
+  }
+
+  .pause-note {
+    margin-bottom: var(--space-3);
+    padding: var(--space-2) var(--space-3);
+    font-size: 13px;
   }
 
   .pause-actions__resume,

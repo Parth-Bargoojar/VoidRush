@@ -112,6 +112,13 @@ body,
   padding: 0;
 }
 
+/* Track the visible viewport as mobile browser toolbars slide in and out. */
+@supports (height: 100dvh) {
+  #root {
+    height: 100dvh;
+  }
+}
+
 body {
   background: var(--color-bg);
   color: var(--color-text-primary);
@@ -146,6 +153,15 @@ canvas {
   inset: 0;
   z-index: var(--z-canvas);
   outline: none;
+  /* The canvas is never a scroll or zoom surface. */
+  touch-action: none;
+}
+
+/* During a run no gesture may pan, zoom or bounce the page: a thumb resting on
+   the glass or a tilt-and-grip must not move the view. Menus keep
+   `manipulation`, so their panels still scroll. */
+body[data-state='PLAYING'] {
+  touch-action: none;
 }
 
 /* Keyboard focus is always visible. [Design 16] */

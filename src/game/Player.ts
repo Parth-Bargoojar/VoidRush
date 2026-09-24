@@ -9,7 +9,7 @@
 
 import { MOVEMENT, WORLD } from '../config/GameConfig';
 import { clamp, damp } from '../utils/MathUtils';
-import type { InputState, Player } from '../types';
+import type { InputState, NormalizedInput, Player } from '../types';
 
 export function createPlayer(): Player {
   return { x: 0, y: 0, vx: 0, vy: 0, prevX: 0, prevY: 0 };
@@ -31,18 +31,13 @@ export function effectiveLateralSpeed(sensitivity: number): number {
 }
 
 /**
- * Advances the player by one fixed step. Diagonal input is normalised so that
- * moving diagonally is never faster than moving straight.
+ * Reduces any input to normalised steering. This is the single point where
+ * sources meet: digital keys give a unit direction (diagonals scaled by
+ * 1/sqrt 2 so they are never faster than straight), analog sources (joystick,
+ * tilt) add to it, and the sum is clamped to unit length so mixing sources can
+ * never beat the top speed. The player controller only ever sees the result.
  */
-export function stepPlayer(
-  player: Player,
-  input: InputState,
-  dt: number,
-  sensitivity: number,
-): void {
-  player.prevX = player.x;
-  player.prevY = player.y;
-
+export function readSteering(input: InputState, out: NormalizedInput): NormalizedInput {
   let dirX = (input.right ? 1 : 0) - (input.left ? 1 : 0);
   let dirY = (input.up ? 1 : 0) - (input.down ? 1 : 0);
   if (dirX !== 0 && dirY !== 0) {
@@ -51,8 +46,6 @@ export function stepPlayer(
     dirY *= inv;
   }
 
-  // Analog stick input adds to the keys; the sum is clamped to unit length so
-  // mixing the two can never beat the top speed.
   const axisX = input.axisX ?? 0;
   const axisY = input.axisY ?? 0;
   if (axisX !== 0 || axisY !== 0) {
@@ -64,6 +57,29 @@ export function stepPlayer(
       dirY /= length;
     }
   }
+
+  out.horizontal = dirX;
+  out.vertical = dirY;
+  return out;
+}
+
+/** Scratch for stepPlayer, so a step allocates nothing. */
+const steering: NormalizedInput = { horizontal: 0, vertical: 0 };
+
+/**
+ * Advances the player by one fixed step from normalised steering, so movement
+ * is identical whether it came from keys, the joystick or tilt.
+ */
+export function stepPlayer(
+  player: Player,
+  input: InputState,
+  dt: number,
+  sensitivity: number,
+): void {
+  player.prevX = player.x;
+  player.prevY = player.y;
+
+  const { horizontal: dirX, vertical: dirY } = readSteering(input, steering);
 
   const maxSpeed = effectiveLateralSpeed(sensitivity);
   player.vx = damp(player.vx, dirX * maxSpeed, MOVEMENT.TAU, dt);

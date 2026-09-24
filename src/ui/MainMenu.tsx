@@ -13,6 +13,10 @@ import { fullscreenSupported, toggleFullscreen, useFullscreen } from './device';
 interface MainMenuProps {
   stats: PersistedStats;
   touch: boolean;
+  /** Tilt steers: the hint describes tilting instead of the joystick. */
+  tilt: boolean;
+  /** A short line about the controls, e.g. why tilt is not in use. */
+  controlNote?: string | null;
   /** The half of the screen the joystick answers on. */
   side: JoystickSide;
   onPlay: () => void;
@@ -24,6 +28,8 @@ interface MainMenuProps {
 export function MainMenu({
   stats,
   touch,
+  tilt,
+  controlNote = null,
   side,
   onPlay,
   onSettings,
@@ -116,7 +122,9 @@ export function MainMenu({
         )}
 
         <p className="caption menu__hint">
-          {touch ? (
+          {tilt ? (
+            'Tilt to steer · Tap ❚❚ to pause'
+          ) : touch ? (
             `Drag on the ${side} to steer · Tap ❚❚ to pause`
           ) : (
             <>
@@ -125,6 +133,11 @@ export function MainMenu({
               <kbd>S</kbd>
               <kbd>D</kbd> to steer · <kbd>Esc</kbd> to pause
             </>
+          )}
+          {controlNote && (
+            <span className="menu__note" role="status">
+              {controlNote}
+            </span>
           )}
         </p>
       </div>

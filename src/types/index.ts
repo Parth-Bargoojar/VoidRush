@@ -145,12 +145,22 @@ export interface InputState {
   left: boolean;
   right: boolean;
   /**
-   * Optional analog steering from the touch joystick, each in [-1, 1] with +Y
-   * up. Combined with the digital keys and clamped to unit length, so a
-   * half-deflected stick flies at half speed and nothing exceeds full speed.
+   * Optional analog steering from the touch joystick and device tilt, each in
+   * [-1, 1] with +Y up. Combined with the digital keys and clamped to unit
+   * length, so a half-deflected stick flies at half speed and nothing exceeds
+   * full speed.
    */
   axisX?: number;
   axisY?: number;
+}
+
+/**
+ * Steering as the player controller consumes it, whatever produced it: each
+ * axis in [-1, 1], vector length at most 1, +horizontal right, +vertical up.
+ */
+export interface NormalizedInput {
+  horizontal: number;
+  vertical: number;
 }
 
 /* ------------------------------------------------------------------ *
@@ -263,9 +273,50 @@ export interface Settings {
   joystickSize: number;
   /** Short vibrations on near misses and impacts, where the device supports it. */
   haptics: boolean;
+  /** AUTO uses tilt on phones and tablets that support it, the keyboard elsewhere. */
+  controlMode: ControlMode;
+  /** Divides the tilt needed for full deflection, 0.5 to 2. */
+  tiltSensitivity: number;
+  /** Degrees around the neutral pose that produce no movement. */
+  tiltDeadZone: number;
+  tiltInvertX: boolean;
+  tiltInvertY: boolean;
 }
 
 export type TouchControlsMode = 'auto' | 'on' | 'off';
+export type ControlMode = 'auto' | 'keyboard' | 'tilt';
+/** The source actually steering after AUTO and any fallback are resolved. */
+export type ActiveControl = 'keyboard' | 'tilt';
+
+/**
+ * Where the tilt source stands.
+ * - `unsupported`: no DeviceOrientation API.
+ * - `needs-permission`: iOS/iPadOS; access must be granted from a tap.
+ * - `denied`: access was refused.
+ * - `off`: available but not listening.
+ * - `waiting`: listening, no reading yet.
+ * - `active`: readings arriving.
+ * - `lost`: readings stopped arriving mid-session.
+ * - `unavailable`: the API exists but no reading ever came (no sensor).
+ */
+export type TiltStatus =
+  | 'unsupported'
+  | 'needs-permission'
+  | 'denied'
+  | 'off'
+  | 'waiting'
+  | 'active'
+  | 'lost'
+  | 'unavailable';
+
+/** Low-frequency control state pushed to React; changes only on events. */
+export interface ControlInfo {
+  active: ActiveControl;
+  status: TiltStatus;
+  calibrated: boolean;
+  /** A phone or tablet, by feature detection. */
+  touchPrimary: boolean;
+}
 export type JoystickMode = 'dynamic' | 'fixed';
 export type JoystickSide = 'left' | 'right';
 

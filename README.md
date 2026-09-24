@@ -19,7 +19,7 @@
 ## ✨ Features
 
 - 🎮 **Intuitive Arcade Controls:** WASD / Arrow key steering with smooth inertial response, positional camera lag, and dynamic turn roll.
-- 📱 **Plays on Phones & Tablets:** Played in landscape, with an analog on-screen joystick (dynamic or fixed, left or right hand, adjustable size), vibration feedback, a safe-area-aware HUD, and a fullscreen / installable web-app mode that holds the screen in landscape.
+- 📱 **Plays on Phones & Tablets:** Steer by tilting the device, with calibration, dead zone, sensitivity and inversion settings. An analog on-screen joystick is the fallback (and an option), with vibration feedback, a safe-area-aware HUD, and a fullscreen / installable web-app mode. Designed for landscape; portrait still plays.
 - 🌀 **Procedural Tunnel Pipeline:** Dynamic cross-section variations (rectangular, polygonal, twisting up to 14°) with seamless segment recycling.
 - 🚧 **8 Distinct Obstacle Archetypes:**
   - **Static Gate** & **Ring / Bullseye**
@@ -42,7 +42,7 @@
 - **3D Graphics Engine:** [Three.js](https://threejs.org/) (WebGL)
 - **Build Tooling:** [Vite](https://vitejs.dev/)
 - **Audio Engine:** Native Web Audio API
-- **Testing Suite:** [Vitest](https://vitest.dev/) (168 unit & integration tests)
+- **Testing Suite:** [Vitest](https://vitest.dev/) (272 unit & integration tests), plus Playwright desktop and mobile browser passes
 - **Deployment:** [Vercel](https://vercel.com/) static hosting
 
 ---
@@ -57,16 +57,28 @@
 | `D` / `Right Arrow` | Steer Right |
 | `ESC` | Pause / Resume Game · Close Settings & Credits |
 
-### Touch (phones & tablets)
+### Tilt (phones & tablets)
+
+| Motion | Action |
+| --- | --- |
+| Lower the right / left edge | Steer right / left |
+| Tip the top edge away / pull it back | Climb / dive (flip with *Invert vertical*) |
+| Hold at your normal angle | Fly straight |
+| Tap the ❚❚ button (top right) | Pause |
+
+Tilt is the default on phones and tablets (**Settings → Controls → Control mode: Auto**). Before the first tilt run the game asks you to hold your device in your normal playing position and counts down *3 · 2 · 1* while it measures that position; that becomes "straight ahead". On iPhone and iPad, Safari asks for motion access when you tap **Play** — nothing is requested on page load. If access is denied or the device has no motion sensor, the on-screen joystick takes over automatically.
+
+Under **Settings → Controls** you can pick *Auto*, *Keyboard* or *Tilt*, adjust tilt sensitivity and dead zone, invert either axis, and recalibrate (also available from the pause menu). Turning the device between orientations mid-run pauses it; tilt recalibrates when you resume. The neutral position is never saved, because how you hold the device changes between sessions.
+
+### Touch joystick
 
 | Gesture | Action |
 | --- | --- |
-| Touch & drag anywhere | Steer — the joystick appears under your thumb and follows it. Push further to fly faster. |
-| Tap the ❚❚ button (top right) | Pause |
+| Touch & drag anywhere | Steer — the joystick appears under your thumb. Push further to fly faster. |
 
-On phones and tablets VOIDRUSH plays in landscape. Held upright, the game shows a *rotate your device* screen, and a run in progress pauses until the device is turned back. Tapping **Play** goes fullscreen and, where the browser allows it (Chrome on Android), locks the screen to landscape so tilting the phone mid-run cannot flip the view.
+VOIDRUSH is designed for landscape. Held upright, a small *Rotate device — for best experience* card appears; it can be dismissed, and portrait still plays. Tapping **Play** goes fullscreen and, when the device is already sideways and the browser allows it (Chrome on Android), locks the screen to landscape so tilting the phone mid-run cannot flip the view.
 
-The joystick is analog: a half-pushed stick steers at half speed, which makes threading narrow gaps easier on glass. The default *dynamic* stick appears under your thumb wherever you touch on its half of the screen, then holds still while you steer and returns to its corner when you let go. The *fixed* stick stays in its corner. Under **Settings → Controls** you can switch between the two, move the stick to the right hand, resize it, turn vibration on or off, or force the joystick on or off (it shows automatically once you touch the screen).
+The joystick is analog: a half-pushed stick steers at half speed, which makes threading narrow gaps easier on glass. The default *dynamic* stick appears under your thumb wherever you touch on its half of the screen, then holds still while you steer and returns to its corner when you let go. The *fixed* stick stays in its corner. Under **Settings → Controls** you can switch between the two, move the stick to the right hand, resize it, turn vibration on or off, or force the joystick on or off (it shows automatically once you touch the screen, unless tilt is steering).
 
 ---
 
@@ -98,6 +110,8 @@ The joystick is analog: a half-pushed stick steers at half speed, which makes th
 4. **Run tests:**
    ```bash
    npm run test
+   npm run e2e          # desktop browser pass (builds first)
+   npm run e2e:mobile   # emulated phone: tilt, permission, calibration, fallbacks
    ```
 
 5. **Build for production:**

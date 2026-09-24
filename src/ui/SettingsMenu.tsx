@@ -7,10 +7,12 @@
  * phone. Every hit target is at least 44 px tall.
  */
 
-import { ArrowLeft, Gamepad2, Monitor, RotateCcw, Volume2 } from 'lucide-react';
+import { ArrowLeft, Crosshair, Gamepad2, Monitor, RotateCcw, Smartphone, Volume2 } from 'lucide-react';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { CAMERA, MOVEMENT } from '../config/GameConfig';
+import { TILT } from '../config/TiltConfig';
 import {
+  CONTROL_MODES,
   JOYSTICK_MODES,
   JOYSTICK_SIDES,
   JOYSTICK_SIZE_MAX,
@@ -18,7 +20,7 @@ import {
   QUALITY_LEVELS,
   TOUCH_CONTROL_MODES,
 } from '../persistence/SettingsStorage';
-import type { Settings } from '../types';
+import type { ControlInfo, Settings, TiltStatus } from '../types';
 import { hapticsSupported } from './device';
 import { Modal } from './Modal';
 
@@ -26,7 +28,12 @@ interface SettingsMenuProps {
   settings: Settings;
   /** True on a touchscreen, for device-specific hints. */
   touch: boolean;
+  /** Which source steers and how tilt is doing. */
+  control: ControlInfo;
   onChange: (patch: Partial<Settings>) => void;
+  /** Asks for motion access (iOS) or retries a silent sensor. A user gesture. */
+  onEnableTilt: () => void;
+  onRecalibrate: () => void;
   onReset: () => void;
   onBack: () => void;
   onHover: () => void;
@@ -165,13 +172,42 @@ function Section({ title, children }: { title: string; children: ReactNode }): J
   );
 }
 
+/** Plain-language tilt status for the Controls tab. */
+function tiltStatusText(status: TiltStatus, control: ControlInfo): string {
+  switch (status) {
+    case 'unsupported':
+      return 'This browser does not report device motion.';
+    case 'needs-permission':
+      return 'Motion access is needed before tilt can steer.';
+    case 'denied':
+      return 'Motion access was denied. Allow it for this site in your browser settings, then try again.';
+    case 'unavailable':
+      return 'No motion sensor responded on this device.';
+    case 'waiting':
+      return 'Waiting for the motion sensor…';
+    case 'lost':
+      return 'Tilt signal lost. It resumes as soon as the sensor reports again.';
+    case 'active':
+      return control.calibrated
+        ? 'Tilt is steering and calibrated.'
+        : 'Tilt is ready. It calibrates before your next run.';
+    default:
+      return control.touchPrimary
+        ? 'Tilt is off in this control mode.'
+        : 'Auto uses tilt on phones and tablets.';
+  }
+}
+
 const percent = (value: number): string => `${Math.round(value * 100)}%`;
 const times = (value: number): string => `${value.toFixed(2)}×`;
 
 export function SettingsMenu({
   settings,
   touch,
+  control,
   onChange,
+  onEnableTilt,
+  onRecalibrate,
   onReset,
   onBack,
   onHover,
@@ -189,6 +225,11 @@ export function SettingsMenu({
   };
 
   const canVibrate = hapticsSupported();
+  const tiltSteering = control.active === 'tilt';
+  const canEnableTilt =
+    control.status === 'needs-permission' ||
+    control.status === 'denied' ||
+    control.status === 'unavailable';
 
   return (
     <Modal
@@ -329,6 +370,85 @@ export function SettingsMenu({
                 step={0.05}
                 format={times}
                 onChange={(movementSensitivity) => onChange({ movementSensitivity })}
+              />
+              <Choice
+                label="Control mode"
+                hint={
+                  settings.controlMode === 'auto'
+                    ? `Auto: tilt on phones and tablets, keyboard elsewhere. Now using ${control.active}.`
+                    : settings.controlMode !== control.active
+                      ? `Tilt is not available here, so the keyboard and touch steer instead.`
+                      : undefined
+                }
+                options={CONTROL_MODES}
+                value={settings.controlMode}
+                onChange={(controlMode) => onChange({ controlMode })}
+                onHover={onHover}
+              />
+            </Section>
+
+            <Section title="Tilt">
+              <div className="field">
+                <p className="tilt-status" data-status={control.status} role="status">
+                  <Smartphone size={16} strokeWidth={2} aria-hidden="true" />
+                  <span>{tiltStatusText(control.status, control)}</span>
+                </p>
+                <div className="tilt-actions">
+                  {canEnableTilt && (
+                    <button
+                      type="button"
+                      className="button button--secondary"
+                      onClick={onEnableTilt}
+                      onMouseEnter={onHover}
+                    >
+                      <Smartphone size={18} strokeWidth={2} aria-hidden="true" />
+                      {control.status === 'unavailable' ? 'Retry tilt' : 'Enable tilt'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="button button--secondary"
+                    onClick={onRecalibrate}
+                    onMouseEnter={onHover}
+                    disabled={!tiltSteering}
+                  >
+                    <Crosshair size={18} strokeWidth={2} aria-hidden="true" />
+                    Recalibrate tilt
+                  </button>
+                </div>
+              </div>
+              <Slider
+                label="Tilt sensitivity"
+                hint={`Full speed at about ${Math.round(TILT.MAX_TILT / settings.tiltSensitivity)}° of tilt.`}
+                value={settings.tiltSensitivity}
+                min={TILT.SENSITIVITY_MIN}
+                max={TILT.SENSITIVITY_MAX}
+                step={0.05}
+                format={times}
+                onChange={(tiltSensitivity) => onChange({ tiltSensitivity })}
+              />
+              <Slider
+                label="Tilt dead zone"
+                hint="Tilt this small is ignored, so a steady hand holds a steady line."
+                value={settings.tiltDeadZone}
+                min={TILT.DEAD_ZONE_MIN}
+                max={TILT.DEAD_ZONE_MAX}
+                step={0.5}
+                format={(v) => `${v.toFixed(1)}°`}
+                onChange={(tiltDeadZone) => onChange({ tiltDeadZone })}
+              />
+              <Switch
+                label="Invert horizontal"
+                checked={settings.tiltInvertX}
+                onChange={(tiltInvertX) => onChange({ tiltInvertX })}
+                onHover={onHover}
+              />
+              <Switch
+                label="Invert vertical"
+                hint="Off: tip the top edge away to climb. On: flight-stick style, tip away to dive."
+                checked={settings.tiltInvertY}
+                onChange={(tiltInvertY) => onChange({ tiltInvertY })}
+                onHover={onHover}
               />
             </Section>
 

@@ -170,9 +170,9 @@ export function useFullscreen(): boolean {
 /* ------------------------------------------------------------------ *
  * Orientation
  *
- * VOIDRUSH is a landscape game on phones and tablets: the stick sits under one
- * thumb and the tunnel gets the full width of the screen. Portrait is never
- * played; the interface asks for a rotation instead (see RotateGate).
+ * VOIDRUSH is designed for landscape on phones and tablets: the tunnel gets the
+ * full width of the screen and tilt is calibrated for a sideways grip. Portrait
+ * still plays; the interface only suggests a rotation (see RotateHint).
  * ------------------------------------------------------------------ */
 
 const PORTRAIT_QUERY = '(orientation: portrait)';
@@ -217,7 +217,7 @@ export function isPortrait(): boolean {
 }
 
 /**
- * True on phones and tablets, where the game must be played in landscape.
+ * True on phones and tablets, where landscape is the intended orientation.
  * Keyed on the primary pointer, not on recent touches, so a touchscreen laptop
  * is never asked to rotate.
  */
@@ -225,8 +225,8 @@ export function landscapeRequired(): boolean {
   return mediaList(COARSE_QUERY)?.matches ?? false;
 }
 
-/** True while a touch device is held in portrait and play must wait. */
-export function useRotateRequired(): boolean {
+/** True while a touch device is held in portrait, where landscape is suggested. */
+export function useRotateSuggested(): boolean {
   const portrait = useSyncExternalStore(subscribePortrait, isPortrait, () => false);
   const coarse = useSyncExternalStore(subscribeCoarse, landscapeRequired, () => false);
   return portrait && coarse;

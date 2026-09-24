@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "soak": "tsx scripts/soak.ts",
-    "e2e": "npm run build && tsx scripts/browser-qa.ts"
+    "e2e": "npm run build && tsx scripts/browser-qa.ts",
+    "e2e:mobile": "npm run build && tsx scripts/mobile-qa.ts"
   },
   "dependencies": {
     "lucide-react": "^0.469.0",

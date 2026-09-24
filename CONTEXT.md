@@ -283,7 +283,7 @@ this build (documentation only); the entire game was implemented from scratch.
 | UI | Complete — menu, HUD, pause, results, settings, credits |
 | Audio | Complete — procedural synthwave soundtrack (tempo follows speed), optional `public/soundtrack.mp3` override |
 | Persistence | Complete — validated, corruption-tolerant |
-| Tests | 180 passing across 16 files |
+| Tests | 272 passing across 19 files (as of §23) |
 | Soak | Passing — 5 simulated minutes × 10 seeds × 2 bot profiles |
 | Browser QA | Passing — headless Chromium, screenshots captured |
 
@@ -451,7 +451,9 @@ Stated plainly, and separate from the completed work above.
 4. **The autopilot is not a player.** Soak statistics come from a bot with a
    150 ms reaction delay and human-like aim scatter. It is a reasonable proxy
    and the basis for the near-miss tuning, but it is not playtesting.
-5. **No gamepad, touch or mobile support**, as scoped out by the PRD.
+5. **No gamepad support.** Touch and tilt steering on phones and tablets were
+   added after the MVP at the owner's direction (touch joystick, then tilt in
+   §23), beyond the PRD's desktop-only scope.
 6. **Bundle is 719 kB raw / 195 kB gzipped**, dominated by Three.js. Within the
    TRD's "reasonably small" guidance but not aggressively optimised; the
    post-processing passes are the obvious code-splitting candidate.
@@ -559,3 +561,193 @@ typecheck and lint clean; 180 tests passing across 16 files; soak 10/10
 five-minute runs (deep into overdrive), fallback 0.000%, near-miss rate 26.4%;
 browser pass clean with 0 console errors; production build succeeds.
 
+---
+
+## 23. Mobile & Tablet Tilt Controls (2026-09-24)
+
+Owner-directed upgrade: phones and tablets steer by tilting the device, and the
+keyboard is unchanged. This extends the existing input path; it does not add a
+second movement system.
+
+### Input architecture
+
+```
+InputManager (src/game/InputManager.ts)
+├── keyboard           held keys → up/down/left/right booleans (unchanged)
+├── touch joystick     setAxis(x, y)                (unchanged, now a fallback)
+└── tilt               AnalogSource, polled once per fixed step
+      GyroscopeInput (src/input/GyroscopeInput.ts)
+        ├── capability detection   DeviceOrientationEvent present?
+        ├── permission             iOS requestPermission, from a tap only
+        ├── orientation mapping    screen.orientation.angle / window.orientation
+        ├── calibration            averaged neutral pose, memory only
+        ├── dead zone · sensitivity · response curve     (src/input/tilt.ts)
+        ├── smoothing              in update(dt), not in the event
+        └── timeout / probe        lost after 500 ms, unavailable after 1.5 s
+                    ↓
+InputState { up, down, left, right, axisX, axisY }
+                    ↓
+readSteering → NormalizedInput { horizontal, vertical } ∈ [-1, 1], |v| ≤ 1
+                    ↓
+stepPlayer (src/game/Player.ts): the one movement model, same physics for all sources
+```
+
+- **Sensor events only record state.** `handleReading` turns each valid
+  reading into a target axis and stores it in preallocated fields. No
+  allocation, no movement, no React.
+- **The game loop consumes it.** `VoidrushApp.safeStep` calls
+  `InputManager.update(dt)` before `Game.step`. That advances tilt smoothing with
+  the fixed step's dt, checks for a silent sensor, and folds tilt into
+  `axisX/axisY`.
+- **React sees control state only on events.** `ControlInfo` (active source,
+  tilt status, calibrated) is pushed through `AppListener.onControlChange`
+  when it changes, never per frame or per sensor event.
+- **One normalisation point.** `readSteering` is the existing `stepPlayer`
+  direction logic, extracted unchanged. Keys give a unit direction (diagonals
+  × 1/√2), analog sources add to it, and the sum is clamped to unit length.
+
+### Processing pipeline
+
+```
+beta, gamma (alpha unused)
+→ up vector in device frame: (-cos β sin γ, sin β, cos β cos γ)
+→ rotate into screen frame by the screen angle (0 / 90 / 180 / 270)
+→ roll  = asin(-up.x)          right edge lowered = +
+  pitch = atan2(up.y, up.z)    0 flat, 90 upright
+→ minus calibrated neutral
+→ dead zone → sensitivity → response curve (per axis)
+→ inversion
+→ smoothing (first-order low-pass, τ 35 ms) in the game loop
+→ clamp to [-1, 1] → InputManager
+```
+
+All tuning lives in `src/config/TiltConfig.ts`:
+
+| Constant | Value | Notes |
+|---|---|---|
+| Dead zone | 2° (setting, 0–8°) | Rescaled past the edge, so leaving it never jumps |
+| Maximum effective tilt | 22° | Divided by sensitivity: 11° at 2× |
+| Sensitivity | 1.0 (setting, 0.5–2) | |
+| Response exponent | 1.35 | Precise near neutral, full with a deliberate lean |
+| Smoothing τ | 0.035 s | >90% of a step change within 100 ms; the player's own 0.1 s damping follows |
+| Sensor timeout | 500 ms | Status `lost`; output eases to zero; a tilt run pauses |
+| Probe timeout | 1.5 s | No reading ever: status `unavailable` (desktop browsers expose the API with no sensor) |
+| Calibration | 0.7 s settle + 3·2·1 at 0.35 s | Samples averaged across the countdown (~1 s) |
+| Calibration steadiness | ≤ 7° spread | Up to 2 retries ("HOLD STEADY"), then accepted anyway |
+
+### Mobile flow
+
+- **Auto** (default) resolves to tilt on a touch-primary device (`pointer:
+  coarse`, or touch with no hover: feature detection, no user-agent sniffing)
+  that has not refused or failed tilt; otherwise the keyboard, plus the joystick
+  on touchscreens. **Tilt** forces tilt where usable; **Keyboard** never uses it.
+- **Permission.** Android and other permission-free platforms start listening
+  at load, which probes for a real sensor. iOS/iPadOS shows status
+  `needs-permission` and `requestPermission()` is called synchronously from the
+  PLAY, Resume, Restart or ENABLE TILT tap, before fullscreen is requested
+  (fullscreen can consume the gesture). Never on page load.
+- **Calibration** runs before the first tilt run, and again after any quarter
+  turn of the screen. The overlay reads CALIBRATE TILT / Hold your device in
+  your normal playing position / KEEP STILL / 3 · 2 · 1 / READY.
+- **Rotation mid-run** pauses the run, remaps axes immediately and discards the
+  neutral pose; the pause menu says so, and Resume recalibrates (the countdown
+  doubles as a get-ready) then resumes.
+- **Recalibrate** from the pause menu or Settings → Controls.
+- **Fallbacks.** Denied, unsupported or silent sensors switch to the joystick
+  and the menu says why. A signal lost mid-run pauses with "Use touch
+  controls" as a way out. Settings offers Enable / Retry tilt.
+- **Portrait** is no longer blocked. The previous full-screen rotate gate is now
+  a dismissible ROTATE DEVICE / FOR BEST EXPERIENCE card. PLAY only locks
+  landscape when the device is already sideways.
+- **Pause** stays reachable through the existing HUD ❚❚ button, top right,
+  safe-area inset and outside the flight path.
+- **Viewport.** `#root` uses `100dvh` where supported. The canvas also resizes
+  on `visualViewport` resize (mobile toolbars). During a run
+  `body[data-state='PLAYING']` and the canvas use `touch-action: none`, while
+  menus keep `manipulation` so their panels scroll.
+
+### Settings
+
+New fields in `voidrush-settings`: `controlMode` (`auto` | `keyboard` |
+`tilt`), `tiltSensitivity`, `tiltDeadZone`, `tiltInvertX`, `tiltInvertY`.
+Payloads now carry `version: 2`. `migrateSettings` upgrades unversioned (v1)
+payloads. Every existing preference is kept, and a v1 player who had forced the
+joystick **on** gets `controlMode: 'keyboard'`, so they keep the touch steering
+they chose instead of being switched to tilt by the new Auto default. The
+neutral pose is never persisted.
+
+### Implementation decisions
+
+| # | Decision | Why |
+|---|---|---|
+| T1 | Roll/pitch from the gravity vector, not raw beta/gamma | In landscape, gamma wraps at ±90° right where a phone is held upright sideways. The vector form has no seam (tested across the wrap). |
+| T2 | Tilt the top edge away → climb; *Invert vertical* gives flight-stick style | "Lower an edge to fly toward it" is consistent across both axes. The brief did not specify a direction. |
+| T3 | Per-axis dead zone and curve | Holding a pure horizontal line should not leak vertical drift. |
+| T4 | Smoothing in the fixed step, not the event | Frame-rate independent, deterministic, and it keeps movement inside the game loop as required. |
+| T5 | Sensor loss pauses a tilt run | Carrying on would leave the ship unsteerable and kill the player for a hardware hiccup. |
+| T6 | Tilt hides the joystick unless forced on | Touch is for menus and pause in tilt mode. `touchControls: on` still shows it; inputs sum and clamp. |
+| T7 | Keyboard is always live | A tablet with a keyboard case steers either way; the sum is clamped. |
+| T8 | Hard rotate gate replaced by a hint | The brief makes orientation lock non-mandatory. Portrait plays. |
+| T9 | Resume after rotation needs a tap | Calibrating while the player is still re-gripping would record the wrong neutral pose. |
+
+### Files
+
+- **New:** `src/config/TiltConfig.ts`, `src/input/tilt.ts`,
+  `src/input/GyroscopeInput.ts`, `src/input/ControlMode.ts`,
+  `src/ui/CalibrationOverlay.tsx`, `tests/tilt.test.ts`,
+  `tests/controls.test.ts`, `scripts/mobile-qa.ts` (`npm run e2e:mobile`).
+- **Changed:** `src/game/InputManager.ts` (analog composition, `update(dt)`),
+  `src/game/Player.ts` (`readSteering` extracted), `src/app/AppState.ts`
+  (tilt ownership, control resolution, permission, calibration, orientation /
+  loss handling, diagnostics), `src/App.tsx` (launch flow, calibration
+  overlay, portrait hint, gameplay touch lock), `src/types/index.ts`,
+  `src/persistence/SettingsStorage.ts`, `src/ui/SettingsMenu.tsx`,
+  `src/ui/PauseMenu.tsx`, `src/ui/MainMenu.tsx`, `src/ui/device.ts`,
+  `src/ui/RotateGate.tsx` → `src/ui/RotateHint.tsx`, `src/ui/ui.css`,
+  `src/index.css`, `README.md`, `package.json`.
+
+### Verification
+
+- `tsc --noEmit` and `eslint .` are clean.
+- `npm test`: 272 passing across 19 files (69 new). The new tests cover
+  calibration, dead zone, sensitivity, response curve, inversion, clamping,
+  portrait / landscape-left / landscape-right / upside-down mapping, the ±90°
+  seam, null and invalid readings, sensor timeout and no-sensor probing,
+  permission granted / denied / rejected / thrown, listener hygiene, rotation,
+  control-mode selection and settings migration.
+- **WASD unchanged:** every key combination normalises exactly as before, and
+  6,000 fixed steps of mixed key input produce bit-identical player state
+  against a verbatim copy of the previous `stepPlayer`. Soak statistics match
+  §22 exactly (near-miss 26.4%, fallback 0.000%).
+- `npm run e2e` (desktop): all checks pass, 0 console errors.
+- `npm run e2e:mobile`: 61 checks pass, 0 console errors, in headless Chromium
+  emulating a touch phone with synthetic `deviceorientation` events and a
+  stubbed iOS permission API. Covered: no prompt on load; one prompt on PLAY;
+  calibration overlay and countdown; steering in all four directions;
+  touch pause; recalibration from pause; rotation pause, remap, recalibrate
+  and resume with landscape-right steering; sensor loss pause and touch
+  fallback; denied and no-sensor fallbacks; settings persistence; portrait
+  hint and portrait play.
+- `npm run build` succeeds (app chunk 163.5 kB raw / 49.5 kB gzip).
+
+### Physical-device testing still required
+
+No real phone or tablet was available. Everything above ran against
+emulation and synthetic sensor events, which prove the logic, not the feel.
+Still to do on hardware:
+
+1. **iPhone and iPad (Safari, iOS/iPadOS 13+):** the real motion prompt from
+   PLAY; behaviour after denying (Safari may keep answering "denied" until the
+   tab or app restarts); `window.orientation` on older iOS.
+2. **Android Chrome, plus at least one other Android browser:** real sensor
+   rates, the landscape lock, and whether any device reports readings only
+   after a delay longer than the 1.5 s probe.
+3. **Feel tuning:** dead zone, 22° max tilt, exponent 1.35 and τ 35 ms were
+   chosen from first principles. Confirm they suit real hands, and re-check
+   the near-miss band with tilt, since it was tuned against keyboard-like bot
+   input.
+4. **Axis signs on real hardware** in both landscape directions (the maths is
+   tested, but some older Android WebViews report non-standard angles).
+5. **Frame rate with tilt active** on mid-range phones. The event handler
+   allocates nothing and React is not involved, but nothing has been measured
+   on device.
