@@ -1,6 +1,6 @@
 /**
  * Touch support: analog steering, the joystick axis on the input manager, the
- * new settings fields, and the portrait FOV correction.
+ * joystick geometry, the settings fields, and the portrait FOV correction.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -14,6 +14,14 @@ import {
   normaliseSettings,
 } from '../src/persistence/SettingsStorage';
 import { aspectCorrectedFov } from '../src/rendering/CameraController';
+import {
+  DEAD_ZONE,
+  EDGE_MARGIN,
+  inSteeringZone,
+  readStick,
+  spawnCentre,
+  stickRadius,
+} from '../src/ui/joystick';
 import type { InputState } from '../src/types';
 
 const DT = 1 / 120;
@@ -79,9 +87,9 @@ describe('input manager axis', () => {
 });
 
 describe('touch settings', () => {
-  it('defaults to an automatic floating stick on the left, with vibration', () => {
+  it('defaults to an automatic dynamic stick on the left, with vibration', () => {
     expect(DEFAULT_SETTINGS.touchControls).toBe('auto');
-    expect(DEFAULT_SETTINGS.joystickMode).toBe('floating');
+    expect(DEFAULT_SETTINGS.joystickMode).toBe('dynamic');
     expect(DEFAULT_SETTINGS.joystickSide).toBe('left');
     expect(DEFAULT_SETTINGS.haptics).toBe(true);
   });
@@ -102,11 +110,77 @@ describe('touch settings', () => {
     expect(normaliseSettings({ joystickSize: 0 }).joystickSize).toBe(JOYSTICK_SIZE_MIN);
   });
 
+  it('moves a saved floating stick to the dynamic one and keeps a fixed one', () => {
+    expect(normaliseSettings({ joystickMode: 'floating' }).joystickMode).toBe('dynamic');
+    expect(normaliseSettings({ joystickMode: 'fixed' }).joystickMode).toBe('fixed');
+  });
+
   it('upgrades settings saved before touch support existed', () => {
     const legacy = { quality: 'high', fov: 80 };
     const settings = normaliseSettings(legacy);
     expect(settings.quality).toBe('high');
     expect(settings.touchControls).toBe('auto');
+  });
+});
+
+describe('joystick geometry', () => {
+  const R = 60;
+
+  it('reads zero at the centre and inside the dead zone', () => {
+    expect(readStick(0, 0, R)).toEqual({ axisX: 0, axisY: 0, knobX: 0, knobY: 0 });
+    const resting = readStick(R * DEAD_ZONE * 0.9, 0, R);
+    expect(resting.axisX).toBe(0);
+    expect(resting.axisY).toBe(0);
+    // The knob still follows the thumb, so the stick never looks frozen.
+    expect(resting.knobX).toBeGreaterThan(0);
+  });
+
+  it('rises from zero just past the dead zone to one at the rim', () => {
+    expect(readStick(R * DEAD_ZONE + 0.01, 0, R).axisX).toBeLessThan(0.01);
+    expect(readStick(R, 0, R).axisX).toBeCloseTo(1, 6);
+    const half = readStick(R * (DEAD_ZONE + (1 - DEAD_ZONE) / 2), 0, R).axisX;
+    expect(half).toBeCloseTo(0.5, 6);
+  });
+
+  it('points up for a thumb above the centre', () => {
+    const up = readStick(0, -R, R);
+    expect(up.axisX).toBeCloseTo(0, 6);
+    expect(up.axisY).toBeCloseTo(1, 6);
+    expect(readStick(R, 0, R).axisY).toBe(0);
+  });
+
+  it('pins the knob to the rim past the edge instead of moving the base', () => {
+    const far = readStick(R * 3, R * 4, R);
+    expect(Math.hypot(far.knobX, far.knobY)).toBeCloseTo(R, 6);
+    expect(Math.hypot(far.axisX, far.axisY)).toBeCloseTo(1, 6);
+    // The direction is the thumb's: 3-4-5.
+    expect(far.axisX).toBeCloseTo(0.6, 6);
+    expect(far.axisY).toBeCloseTo(-0.8, 6);
+  });
+
+  it('never returns NaN for degenerate input', () => {
+    const zero = readStick(5, 5, 0);
+    expect(zero).toEqual({ axisX: 0, axisY: 0, knobX: 0, knobY: 0 });
+  });
+
+  it('claims only its own half of the screen', () => {
+    expect(inSteeringZone(100, 'left', 844)).toBe(true);
+    expect(inSteeringZone(600, 'left', 844)).toBe(false);
+    expect(inSteeringZone(600, 'right', 844)).toBe(true);
+    expect(inSteeringZone(100, 'right', 844)).toBe(false);
+  });
+
+  it('spawns under the thumb, nudged only to stay on screen', () => {
+    expect(spawnCentre({ x: 200, y: 250 }, R, 844, 390)).toEqual({ x: 200, y: 250 });
+    const corner = spawnCentre({ x: 2, y: 389 }, R, 844, 390);
+    expect(corner).toEqual({ x: R + EDGE_MARGIN, y: 390 - R - EDGE_MARGIN });
+  });
+
+  it('sizes the stick from the setting, within a fifth of the short side', () => {
+    expect(stickRadius(1, 844, 390)).toBe(60);
+    expect(stickRadius(1.35, 844, 390)).toBeCloseTo(78, 6);
+    expect(stickRadius(1.35, 640, 320)).toBe(64);
+    expect(stickRadius(0.1, 844, 390)).toBe(40);
   });
 });
 

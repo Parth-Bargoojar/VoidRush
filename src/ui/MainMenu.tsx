@@ -6,13 +6,15 @@
 
 import { Info, Maximize, Minimize, Play, Settings } from 'lucide-react';
 import { useEffect, useRef } from 'react';
-import type { PersistedStats } from '../types';
+import type { JoystickSide, PersistedStats } from '../types';
 import { formatNumber, formatTime } from '../utils/MathUtils';
 import { fullscreenSupported, toggleFullscreen, useFullscreen } from './device';
 
 interface MainMenuProps {
   stats: PersistedStats;
   touch: boolean;
+  /** The half of the screen the joystick answers on. */
+  side: JoystickSide;
   onPlay: () => void;
   onSettings: () => void;
   onCredits: () => void;
@@ -22,6 +24,7 @@ interface MainMenuProps {
 export function MainMenu({
   stats,
   touch,
+  side,
   onPlay,
   onSettings,
   onCredits,
@@ -114,7 +117,7 @@ export function MainMenu({
 
         <p className="caption menu__hint">
           {touch ? (
-            'Drag anywhere to steer · Tap ❚❚ to pause'
+            `Drag on the ${side} to steer · Tap ❚❚ to pause`
           ) : (
             <>
               <kbd>W</kbd>

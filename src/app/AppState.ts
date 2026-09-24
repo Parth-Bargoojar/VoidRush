@@ -166,7 +166,7 @@ export class VoidrushApp {
     this.input = new InputManager({
       onPauseToggle: () => this.handleEscape(),
       // [§9.4] Losing focus or visibility forces a pause.
-      onBlur: () => this.pauseForBlur(),
+      onBlur: () => this.pause(),
       isPlaying: () => this.machine.state === 'PLAYING',
     });
     this.input.attach();
@@ -397,9 +397,15 @@ export class VoidrushApp {
     }
   }
 
-  private pauseForBlur(): void {
+  /**
+   * Pauses a run if one is in progress, and does nothing otherwise. Used when
+   * the run can no longer be played as it is: focus lost, or a phone turned
+   * to portrait.
+   */
+  pause(): void {
     if (this.machine.state !== 'PLAYING') return;
     this.audio.setDucked(true);
+    this.input?.clear();
     this.transition('PAUSE');
   }
 

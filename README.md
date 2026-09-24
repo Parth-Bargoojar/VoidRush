@@ -19,7 +19,7 @@
 ## ✨ Features
 
 - 🎮 **Intuitive Arcade Controls:** WASD / Arrow key steering with smooth inertial response, positional camera lag, and dynamic turn roll.
-- 📱 **Plays on Phones & Tablets:** An analog on-screen joystick (floating or fixed, left or right hand, adjustable size), vibration feedback, safe-area-aware HUD, bottom-sheet menus, portrait and landscape support, and a fullscreen / installable web-app mode.
+- 📱 **Plays on Phones & Tablets:** Played in landscape, with an analog on-screen joystick (dynamic or fixed, left or right hand, adjustable size), vibration feedback, a safe-area-aware HUD, and a fullscreen / installable web-app mode that holds the screen in landscape.
 - 🌀 **Procedural Tunnel Pipeline:** Dynamic cross-section variations (rectangular, polygonal, twisting up to 14°) with seamless segment recycling.
 - 🚧 **8 Distinct Obstacle Archetypes:**
   - **Static Gate** & **Ring / Bullseye**
@@ -64,7 +64,9 @@
 | Touch & drag anywhere | Steer — the joystick appears under your thumb and follows it. Push further to fly faster. |
 | Tap the ❚❚ button (top right) | Pause |
 
-The joystick is analog: a half-pushed stick steers at half speed, which makes threading narrow gaps easier on glass. Under **Settings → Controls** you can switch between a *floating* and a *fixed* stick, move it to the right hand, resize it, turn vibration on or off, or force the joystick on or off (it shows automatically once you touch the screen). For the best view, play in landscape, or add the game to your home screen so it runs fullscreen.
+On phones and tablets VOIDRUSH plays in landscape. Held upright, the game shows a *rotate your device* screen, and a run in progress pauses until the device is turned back. Tapping **Play** goes fullscreen and, where the browser allows it (Chrome on Android), locks the screen to landscape so tilting the phone mid-run cannot flip the view.
+
+The joystick is analog: a half-pushed stick steers at half speed, which makes threading narrow gaps easier on glass. The default *dynamic* stick appears under your thumb wherever you touch on its half of the screen, then holds still while you steer and returns to its corner when you let go. The *fixed* stick stays in its corner. Under **Settings → Controls** you can switch between the two, move the stick to the right hand, resize it, turn vibration on or off, or force the joystick on or off (it shows automatically once you touch the screen).
 
 ---
 

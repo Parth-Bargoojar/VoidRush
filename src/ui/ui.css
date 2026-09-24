@@ -1231,18 +1231,19 @@ code {
 
 .touch-anchor {
   position: absolute;
-  bottom: calc(var(--safe-bottom) + max(28px, 7vh));
+  /* Where a thumb rests with the phone held sideways: low, and in from the edge. */
+  bottom: calc(var(--safe-bottom) + max(24px, 9vh));
   width: calc(var(--stick-radius) * 2);
   height: calc(var(--stick-radius) * 2);
   pointer-events: none;
 }
 
 .touch-anchor--left {
-  left: calc(var(--safe-left) + max(28px, 6vw));
+  left: calc(var(--safe-left) + max(32px, 7vw));
 }
 
 .touch-anchor--right {
-  right: calc(var(--safe-right) + max(28px, 6vw));
+  right: calc(var(--safe-right) + max(32px, 7vw));
 }
 
 .stick {
@@ -1264,7 +1265,7 @@ code {
     opacity 240ms var(--ease-default);
 }
 
-.touch-layer--floating .stick[data-active='false'] {
+.touch-layer--dynamic .stick[data-active='false'] {
   opacity: 0.28;
 }
 
@@ -1345,9 +1346,7 @@ code {
 
 .touch-hint {
   position: absolute;
-  left: 50%;
-  bottom: calc(var(--safe-bottom) + max(28px, 7vh) + var(--stick-radius) * 2 + 20px);
-  transform: translateX(-50%);
+  bottom: calc(var(--safe-bottom) + max(24px, 9vh) + var(--stick-radius) * 2 + 16px);
   padding: var(--space-2) var(--space-4);
   font-size: 12px;
   font-weight: 700;
@@ -1362,6 +1361,15 @@ code {
   animation: hint-pulse 1.8s ease-in-out infinite;
 }
 
+/* Above the resting stick, on its own side, so the eye goes straight to it. */
+.touch-hint--left {
+  left: calc(var(--safe-left) + max(32px, 7vw));
+}
+
+.touch-hint--right {
+  right: calc(var(--safe-right) + max(32px, 7vw));
+}
+
 @keyframes hint-pulse {
   0%,
   100% {
@@ -1369,6 +1377,78 @@ code {
   }
   50% {
     opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Rotate gate: phones and tablets held upright
+ * ------------------------------------------------------------------ */
+
+.rotate-gate {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-gate);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: max(var(--space-8), var(--safe-top)) max(var(--space-6), var(--safe-right))
+    max(var(--space-8), var(--safe-bottom)) max(var(--space-6), var(--safe-left));
+  background: var(--color-bg);
+  text-align: center;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.rotate-gate__device {
+  display: flex;
+  margin-bottom: var(--space-2);
+  color: var(--color-white);
+  animation: rotate-hint 2.4s var(--ease-default) infinite;
+}
+
+/* Upright, a quarter turn to landscape, a beat to read it, then back. */
+@keyframes rotate-hint {
+  0%,
+  15% {
+    transform: rotate(0deg);
+  }
+  45%,
+  80% {
+    transform: rotate(-90deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.rotate-gate__title {
+  margin: 0;
+  font-size: clamp(22px, 7vw, 30px);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-primary);
+}
+
+.rotate-gate__body {
+  max-width: 320px;
+  margin: 0 0 var(--space-2);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+
+.rotate-gate__caption {
+  max-width: 280px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rotate-gate__device {
+    animation: none;
+    transform: rotate(-90deg);
   }
 }
 

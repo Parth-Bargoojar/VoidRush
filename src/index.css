@@ -70,6 +70,7 @@
   --z-notifications: 20;
   --z-overlay: 50;
   --z-modal: 100;
+  --z-gate: 150;
   --z-critical: 200;
 
   --font-sans: Inter, 'Segoe UI', Roboto, Arial, Helvetica, sans-serif;

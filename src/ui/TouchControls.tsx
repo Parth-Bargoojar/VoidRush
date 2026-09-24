@@ -1,10 +1,17 @@
 /**
- * The on-screen joystick.
+ * The on-screen joystick, built for a phone held in landscape.
  *
- * FLOATING (the default) spawns the stick wherever the thumb lands, so there is
- * no target to find by feel, and drags it along when the thumb travels past its
- * edge, so steering never "runs out". FIXED keeps it in a corner for players who
- * prefer a physical anchor.
+ * DYNAMIC (the default) is the layout most mobile action games settle on. The
+ * stick rests as a ghost in the lower corner to show where the thumb goes. A
+ * touch anywhere on that side of the screen places the base right under the
+ * thumb, so every drag starts from centre with no jump. The base then stays
+ * where it was placed for the whole drag: it never slides after the thumb, and
+ * past the rim the knob pins to the edge at full deflection. On release it
+ * glides back to its corner. FIXED keeps the base in the corner for players who
+ * want a physical anchor; a drag must start on or near the stick.
+ *
+ * The other half of the screen is left alone, so the second thumb can rest or
+ * reach the pause button without taking over the stick.
  *
  * The output is analog: a half-pushed stick flies at half speed, which is what
  * makes threading a narrow gap possible on glass. A small radial dead zone keeps
@@ -17,6 +24,14 @@
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react';
 import type { JoystickMode, JoystickSide } from '../types';
+import {
+  FIXED_GRAB_RADII,
+  inSteeringZone,
+  readStick,
+  spawnCentre,
+  stickRadius,
+  type Point,
+} from './joystick';
 
 interface TouchControlsProps {
   mode: JoystickMode;
@@ -24,20 +39,6 @@ interface TouchControlsProps {
   /** Radius multiplier from settings. */
   size: number;
   onAxis: (x: number, y: number) => void;
-}
-
-/** Base radius in CSS pixels at size 1. */
-const BASE_RADIUS = 60;
-/** Fraction of the radius the stick ignores, so a resting thumb does not drift. */
-const DEAD_ZONE = 0.12;
-/** In FIXED mode, a touch must start within this many radii of the stick. */
-const FIXED_GRAB_RADII = 2.2;
-/** Keeps a floating stick fully on screen. */
-const EDGE_MARGIN = 8;
-
-interface Point {
-  x: number;
-  y: number;
 }
 
 export function TouchControls({
@@ -61,11 +62,10 @@ export function TouchControls({
   axisRef.current = onAxisProp;
   const onAxis = (x: number, y: number): void => axisRef.current(x, y);
 
-  const radius = useCallback((): number => {
-    // Never let the stick take more than a fifth of the short side of the screen.
-    const shortSide = Math.min(window.innerWidth, window.innerHeight);
-    return Math.max(40, Math.min(BASE_RADIUS * size, shortSide * 0.2));
-  }, [size]);
+  const radius = useCallback(
+    (): number => stickRadius(size, window.innerWidth, window.innerHeight),
+    [size],
+  );
 
   const restPoint = useCallback((): Point => {
     const rect = anchorRef.current?.getBoundingClientRect();
@@ -83,68 +83,49 @@ export function TouchControls({
   }, []);
 
   const rest = useCallback(() => {
-    const r = radius();
-    layerRef.current?.style.setProperty('--stick-radius', `${r}px`);
+    layerRef.current?.style.setProperty('--stick-radius', `${radius()}px`);
     centre.current = restPoint();
     place(centre.current, 0, 0, false);
   }, [place, radius, restPoint]);
 
   // Park the stick at its resting corner, and again whenever the screen changes.
+  // A phone's toolbar sliding away fires resize mid-drag; the stick must not
+  // jump out from under the thumb, so it re-parks on release instead.
   useEffect(() => {
     rest();
-    window.addEventListener('resize', rest);
-    return () => window.removeEventListener('resize', rest);
+    const onResize = (): void => {
+      if (pointerId.current === null) rest();
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, [rest]);
 
-  // Leaving the screen (pause, crash) must never leave the ship steering.
+  // Leaving the screen (pause, crash, rotation) must never leave the ship steering.
   useEffect(() => () => axisRef.current(0, 0), []);
 
   const track = (x: number, y: number): void => {
-    const r = radius();
-    let dx = x - centre.current.x;
-    let dy = y - centre.current.y;
-    let distance = Math.hypot(dx, dy);
-
-    if (distance > r) {
-      if (mode === 'floating') {
-        // Drag the base along behind the thumb so it stays under it.
-        const pull = 1 - r / distance;
-        centre.current = { x: centre.current.x + dx * pull, y: centre.current.y + dy * pull };
-        dx = x - centre.current.x;
-        dy = y - centre.current.y;
-      } else {
-        dx *= r / distance;
-        dy *= r / distance;
-      }
-      distance = r;
-    }
-
-    const magnitude = distance / r;
-    if (magnitude < DEAD_ZONE) {
-      onAxis(0, 0);
-    } else {
-      // Rescale past the dead zone so the output still starts from zero.
-      const scaled = (magnitude - DEAD_ZONE) / (1 - DEAD_ZONE);
-      onAxis((dx / distance) * scaled, (-dy / distance) * scaled);
-    }
-    place(centre.current, dx, dy, true);
+    const reading = readStick(x - centre.current.x, y - centre.current.y, radius());
+    onAxis(reading.axisX, reading.axisY);
+    place(centre.current, reading.knobX, reading.knobY, true);
   };
 
   const handleDown = (event: PointerEvent<HTMLDivElement>): void => {
     if (pointerId.current !== null) return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
 
-    const r = radius();
+    const width = window.innerWidth;
+    const height = window.innerHeight;
     const point = { x: event.clientX, y: event.clientY };
+    // A touch on the far side belongs to the other thumb; it never claims the stick.
+    if (!inSteeringZone(point.x, side, width)) return;
+
+    const r = radius();
     if (mode === 'fixed') {
       const home = restPoint();
       if (Math.hypot(point.x - home.x, point.y - home.y) > r * FIXED_GRAB_RADII) return;
       centre.current = home;
     } else {
-      centre.current = {
-        x: Math.min(Math.max(point.x, r + EDGE_MARGIN), window.innerWidth - r - EDGE_MARGIN),
-        y: Math.min(Math.max(point.y, r + EDGE_MARGIN), window.innerHeight - r - EDGE_MARGIN),
-      };
+      centre.current = spawnCentre(point, r, width, height);
     }
 
     event.preventDefault();
@@ -172,7 +153,7 @@ export function TouchControls({
   };
 
   const hint =
-    mode === 'floating' ? 'Touch and drag anywhere to steer' : 'Drag the stick to steer';
+    mode === 'dynamic' ? `Touch the ${side} side to steer` : 'Drag the stick to steer';
 
   return (
     <div

@@ -255,7 +255,7 @@ export interface Settings {
   visualIntensity: number;
   /** Whether the on-screen joystick is shown. AUTO follows the device. */
   touchControls: TouchControlsMode;
-  /** FLOATING spawns the stick under the thumb; FIXED keeps it in a corner. */
+  /** DYNAMIC places the stick under the thumb; FIXED keeps it in a corner. */
   joystickMode: JoystickMode;
   /** Which corner the stick rests in. */
   joystickSide: JoystickSide;
@@ -266,7 +266,7 @@ export interface Settings {
 }
 
 export type TouchControlsMode = 'auto' | 'on' | 'off';
-export type JoystickMode = 'floating' | 'fixed';
+export type JoystickMode = 'dynamic' | 'fixed';
 export type JoystickSide = 'left' | 'right';
 
 /** Persisted under `voidrush-stats`. Schema fixed by the TRD. */

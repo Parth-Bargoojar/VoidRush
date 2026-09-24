@@ -22,7 +22,8 @@ export const SETTINGS_KEY = 'voidrush-settings';
 
 export const QUALITY_LEVELS: readonly QualityLevel[] = ['low', 'medium', 'high', 'ultra'];
 export const TOUCH_CONTROL_MODES: readonly TouchControlsMode[] = ['auto', 'on', 'off'];
-export const JOYSTICK_MODES: readonly JoystickMode[] = ['floating', 'fixed'];
+// A saved 'floating' (a retired stick that slid after the thumb) reads as the default.
+export const JOYSTICK_MODES: readonly JoystickMode[] = ['dynamic', 'fixed'];
 export const JOYSTICK_SIDES: readonly JoystickSide[] = ['left', 'right'];
 export const JOYSTICK_SIZE_MIN = 0.75;
 export const JOYSTICK_SIZE_MAX = 1.35;
@@ -41,7 +42,7 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   bloomIntensity: 1,
   visualIntensity: 1,
   touchControls: 'auto' as TouchControlsMode,
-  joystickMode: 'floating' as JoystickMode,
+  joystickMode: 'dynamic' as JoystickMode,
   joystickSide: 'left' as JoystickSide,
   joystickSize: 1,
   haptics: true,

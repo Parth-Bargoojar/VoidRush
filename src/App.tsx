@@ -15,9 +15,17 @@ import { GameOver } from './ui/GameOver';
 import { HUD } from './ui/HUD';
 import { MainMenu } from './ui/MainMenu';
 import { PauseMenu } from './ui/PauseMenu';
+import { RotateGate } from './ui/RotateGate';
 import { SettingsMenu } from './ui/SettingsMenu';
 import { TouchControls } from './ui/TouchControls';
-import { canHover, enterFullscreen, useTouchInput } from './ui/device';
+import {
+  canHover,
+  enterFullscreen,
+  landscapeRequired,
+  lockLandscape,
+  useRotateRequired,
+  useTouchInput,
+} from './ui/device';
 import type { GameState, PersistedStats, RunStats, Settings } from './types';
 import './ui/ui.css';
 
@@ -72,6 +80,14 @@ export function App(): JSX.Element {
   const showTouchControls =
     settings.touchControls === 'on' || (settings.touchControls === 'auto' && touchDetected);
 
+  // Phones and tablets play in landscape only. Held upright, the rotate gate
+  // covers every screen, and a run in progress pauses so turning the device
+  // back lands on the pause menu rather than straight into an obstacle.
+  const rotateRequired = useRotateRequired();
+  useEffect(() => {
+    if (rotateRequired && state === 'PLAYING') appRef.current?.pause();
+  }, [rotateRequired, state]);
+
   // On a touchscreen, mouseenter fires as part of a tap and would double every
   // click sound, so hover feedback is only for real hovering pointers.
   const hover = useCallback(() => {
@@ -114,7 +130,7 @@ export function App(): JSX.Element {
     <>
       <canvas ref={canvasRef} aria-label={CANVAS_LABEL} tabIndex={-1} />
 
-      {state === 'PLAYING' && showTouchControls && (
+      {state === 'PLAYING' && showTouchControls && !rotateRequired && (
         <TouchControls
           mode={settings.joystickMode}
           side={settings.joystickSide}
@@ -131,10 +147,14 @@ export function App(): JSX.Element {
         <MainMenu
           stats={stats}
           touch={showTouchControls}
+          side={settings.joystickSide}
           onPlay={click((instance) => {
+            if (rotateRequired) return;
             // Phones lose a fifth of the screen to browser chrome; take it back
-            // while the tap still counts as a user gesture.
-            if (touchDetected) enterFullscreen();
+            // while the tap still counts as a user gesture, and hold the screen
+            // in landscape so tilting the phone mid-run cannot flip the view.
+            if (landscapeRequired()) void lockLandscape();
+            else if (touchDetected) void enterFullscreen();
             instance.startRun();
           })}
           onSettings={click((instance) => instance.openSettings())}
@@ -179,6 +199,8 @@ export function App(): JSX.Element {
       {state === 'CREDITS' && (
         <Credits onBack={click((instance) => instance.back())} onHover={hover} />
       )}
+
+      {rotateRequired && <RotateGate onClick={() => appRef.current?.playSound('UI_CLICK')} />}
     </>
   );
 }

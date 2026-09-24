@@ -344,8 +344,8 @@ export function SettingsMenu({
               <Choice
                 label="Style"
                 hint={
-                  settings.joystickMode === 'floating'
-                    ? 'Appears under your thumb wherever you touch, and follows it.'
+                  settings.joystickMode === 'dynamic'
+                    ? 'Appears under your thumb anywhere on its half of the screen, then holds still while you steer.'
                     : 'Stays in the corner; start your drag on the stick.'
                 }
                 options={JOYSTICK_MODES}
